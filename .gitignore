@@ -1,0 +1,60 @@
+
+# ############################
+# lexicons, machine learning models, and config files that can't or
+# shouldn't be distributed via git
+
+data/
+
+# ############################
+# temporary and editor files
+
+*~
+~*
+\#*
+\.\#*
+
+# ############################
+# Java errata files
+
+bin/
+target/
+*.jar
+
+# #############
+# Eclipse files
+
+.project
+.classpath
+.settings
+install.xml
+
+# #############
+# IntelliJ files
+
+**/.idea/libraries
+**/.idea/shelf
+**/.idea/*.xml
+*.iml
+
+# ############################
+# Python errata files
+
+.cache
+.ipynb_checkpoints
+__pycache__
+*.pyc
+
+# ############################
+# LaTeX errata files
+
+*.aux
+*.log
+
+# ############################
+# coverage and unit testing files
+
+.coverage
+coverage.xml
+junit.xml
+cov_*/
+apache-uima/data/test/
