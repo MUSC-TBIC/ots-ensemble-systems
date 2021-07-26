@@ -11,11 +11,8 @@ import cassis
 
 top10_offset = {}
 
-def main( inputDir , outputDir ):
-    teams = [ os.path.basename( f ) for f in glob.glob( os.path.join( inputDir ,
-                                                                      '..' ,
-                                                                      '..' ,
-                                                                      'top10_outputs' ,
+def main( args ):
+    teams = [ os.path.basename( f ) for f in glob.glob( os.path.join( args.inputSysDir ,
                                                                       '*.txt' ) ) ]
     for team in teams:
         top10_offset[ team ] = -1
@@ -32,6 +29,16 @@ def main( inputDir , outputDir ):
                                               supertypeName = 'uima.tcas.Annotation' )
     typesystem.add_feature( type_ = TokenAnnotation ,
                             name = 'text' , 
+                            rangeTypeName = 'uima.cas.String' )
+    ############
+    ## ... for Metadata
+    ## TODO - this parent and supertype should probably be something else
+    NoteMetadata = typesystem.create_type( name = 'refsem.Metadata' ,
+                                           supertypeName = 'uima.tcas.Annotation' )
+    ## TODO - how to represent pairs, as per the reference standard?
+    typesystem.add_feature( type_ = NoteMetadata ,
+                            name = 'other' ,
+                            description = '' ,
                             rangeTypeName = 'uima.cas.String' )
     ############
     ## ... for UmlsConcept
@@ -63,23 +70,28 @@ def main( inputDir , outputDir ):
                             rangeTypeName = 'uima.cas.Double' )
     ############################
     ## Iterate over the files, covert to CAS, and write the XMI to disk
-    filenames = [ os.path.basename( f ) for f in glob.glob( os.path.join( inputDir ,
-                                                                          '*.txt' ) ) ]
+    filenames = []
+    with open( args.fileList , 'r' ) as fp:
+        for line in fp:
+            line = line.strip()
+            filenames.append( line )
+    ##
     for filename in tqdm( filenames ):
-        if( filename != '0034.txt' ):
+        if( filename != '0034' ):
             continue
-        norm_filename = re.sub( '.txt$' ,
-                                '.norm' ,
-                                filename )
-        xmi_filename = re.sub( '.txt$' ,
-                               '.xmi' ,
-                               filename )
-        with open( os.path.join( inputDir , filename ) , 'r' ) as fp:
+        norm_filename = '{}.norm'.format( filename )
+        xmi_filename = '{}.xmi'.format( filename )
+        with open( os.path.join( args.inputTextDir , '{}.txt'.format( filename ) ) , 'r' ) as fp:
             note_contents = fp.read()
         cas = cassis.Cas( typesystem = typesystem )
         cas.sofa_string = note_contents
         cas.sofa_mime = "text/plain"
         sectionized_note = nlp_pipeline( note_contents )
+        team_id = 0
+        cas.add_annotation( NoteMetadata( other = '{}={}'.format( 'Oracle' , team_id ) ) )
+        for team in sorted( teams ):
+            team_id += 1
+            cas.add_annotation( NoteMetadata( other = '{}={}'.format( team , team_id ) ) )
         ########################
         ## Tokens
         ## - https://spacy.io/api/token
@@ -93,7 +105,7 @@ def main( inputDir , outputDir ):
         annot_count = -1
         annot_begins = {}
         annot_ends = {}
-        with open( os.path.join( inputDir , '..' , 'train_norm' , norm_filename ) , 'r' ) as fp:
+        with open( os.path.join( args.inputNormDir , norm_filename ) , 'r' ) as fp:
             for line in fp:
                 line = line.strip()
                 annot_count += 1
@@ -111,10 +123,7 @@ def main( inputDir , outputDir ):
         team_id = 0
         for team in sorted( teams ):
             team_id += 1
-            team_filename = os.path.join( inputDir ,
-                                          '..' ,
-                                          '..' ,
-                                          'top10_outputs' ,
+            team_filename = os.path.join( args.inputSysDir ,
                                           team )
             with open( team_filename , 'r' ) as team_fp:
                 line_count = -1
@@ -134,15 +143,25 @@ def main( inputDir , outputDir ):
                                                                   discoveryTechnique = team_id )
                     cas.add_annotation( identified_annotation )
                 top10_offset[ team ] = line_count
-        cas.to_xmi( path = os.path.join( outputDir , xmi_filename ) ,
+        cas.to_xmi( path = os.path.join( args.outputDir , xmi_filename ) ,
                     pretty_print = True )
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser( description = 'Simple spaCy pipeline for converting n2c2 2019 Track 3 to CAS XMI files with a SHARP-n schema' )
-    parser.add_argument( 'inputDir' ,
-                         help = 'Input directory containing plain text files to split' )
-    parser.add_argument( 'outputDir' ,
+    parser.add_argument( '--input-text' ,
+                         dest = 'inputTextDir' ,
+                         help = 'Input directory containing plain text files' )
+    parser.add_argument( '--input-norm' ,
+                         dest = 'inputNormDir' ,
+                         help = 'Input directory containing normalized files' )
+    parser.add_argument( '--input-systems' ,
+                         dest = 'inputSysDir' ,
+                         help = 'Input directory containing the system output file' )
+    parser.add_argument( '--file-list' ,
+                         dest = 'fileList' ,
+                         help = 'File containing the basename of all files in order' )
+    parser.add_argument( '--output-dir' ,
+                         dest = 'outputDir' ,
                          help = 'Output directory for writing CAS XMI files to' )
     args = parser.parse_args()
-    main( os.path.abspath( args.inputDir ) ,
-          os.path.abspath( args.outputDir ) )
+    main( args )
