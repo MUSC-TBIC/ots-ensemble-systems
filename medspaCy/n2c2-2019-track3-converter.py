@@ -9,13 +9,9 @@ import spacy
 import medspacy
 import cassis
 
-top10_offset = {}
-
 def main( args ):
     teams = [ os.path.basename( f ) for f in glob.glob( os.path.join( args.inputSysDir ,
                                                                       '*.txt' ) ) ]
-    for team in teams:
-        top10_offset[ team ] = -1
     ## Load an clinical English medspaCy model trained on i2b2 data
     ## - https://github.com/medspacy/sectionizer/blob/master/notebooks/00-clinical_sectionizer.ipynb
     nlp_pipeline = spacy.load( 'en_info_3700_i2b2_2012' )
@@ -76,9 +72,11 @@ def main( args ):
             line = line.strip()
             filenames.append( line )
     ##
+    oracle_watermark = 0
+    oracle_first_norm = {}
+    oracle_last_norm = {}
+    oracle_norm_size = {}
     for filename in tqdm( filenames ):
-        if( filename != '0034' ):
-            continue
         norm_filename = '{}.norm'.format( filename )
         xmi_filename = '{}.xmi'.format( filename )
         with open( os.path.join( args.inputTextDir , '{}.txt'.format( filename ) ) , 'r' ) as fp:
@@ -105,14 +103,25 @@ def main( args ):
         annot_count = -1
         annot_begins = {}
         annot_ends = {}
+        oracle_first_norm[ filename ] = oracle_watermark
         with open( os.path.join( args.inputNormDir , norm_filename ) , 'r' ) as fp:
             for line in fp:
                 line = line.strip()
                 annot_count += 1
-                norm_id , cui , begin_offset , end_offset = line.split( '||' )
-                annot_begins[ annot_count ] = begin_offset
-                annot_ends[ annot_count ] = end_offset
+                ## TODO - this treats discontinous spans as a single span from the
+                ##        first begin to the last end offsets
+                ##        0038    N158||C0085606||975||982||995||1002 ->
+                ##        0038    N158||C0085606||975||1002
+                cols = line.split( '||' )
+                norm_id = cols[ 0 ]
+                cui = cols[ 1 ]
+                begin_offset = cols[ 2 ]
+                end_offset = cols[ -1 ]
+                annot_begins[ oracle_watermark + annot_count ] = begin_offset
+                annot_ends[ oracle_watermark + annot_count ] = end_offset
+                ## TODO - Should a UMLS concept be uniquely represented once?
                 umls_concept = UmlsConcept( cui = cui )
+                ## TODO - convert concepts to concept arrays
                 cas.add_annotation( umls_concept )
                 concept_id = umls_concept.xmiID
                 identified_annotation = IdentifiedAnnotation( begin = begin_offset ,
@@ -120,6 +129,9 @@ def main( args ):
                                                               ontologyConceptArray = concept_id ,
                                                               discoveryTechnique = '0' )
                 cas.add_annotation( identified_annotation )
+        oracle_norm_size[ filename ] = annot_count
+        oracle_watermark += annot_count
+        oracle_last_norm[ filename ] = oracle_watermark
         team_id = 0
         for team in sorted( teams ):
             team_id += 1
@@ -129,9 +141,9 @@ def main( args ):
                 line_count = -1
                 for line in team_fp:
                     line_count += 1
-                    if( line_count <= top10_offset[ team ] ):
-                        next
-                    elif( line_count > annot_count ):
+                    if( line_count < oracle_first_norm[ filename ] ):
+                        continue
+                    elif( line_count > oracle_last_norm[ filename ] ):
                         break
                     line = line.strip()
                     umls_concept = UmlsConcept( cui = line )
@@ -142,9 +154,9 @@ def main( args ):
                                                                   ontologyConceptArray = concept_id ,
                                                                   discoveryTechnique = team_id )
                     cas.add_annotation( identified_annotation )
-                top10_offset[ team ] = line_count
         cas.to_xmi( path = os.path.join( args.outputDir , xmi_filename ) ,
                     pretty_print = True )
+        oracle_watermark += 1
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser( description = 'Simple spaCy pipeline for converting n2c2 2019 Track 3 to CAS XMI files with a SHARP-n schema' )
