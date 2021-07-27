@@ -112,6 +112,11 @@ def main( args ):
                 ##        first begin to the last end offsets
                 ##        0038    N158||C0085606||975||982||995||1002 ->
                 ##        0038    N158||C0085606||975||1002
+                ## Known problematic annotation pair introduced by this simplification:
+                ##
+                ##   test_norm/523704694.norm:
+                ##     N214||C0230330||5083||5093||5104||5113
+                ##     N215||C0230416||5083||5087||5098||5113
                 cols = line.split( '||' )
                 norm_id = cols[ 0 ]
                 cui = cols[ 1 ]
