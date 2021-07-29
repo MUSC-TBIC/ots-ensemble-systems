@@ -1,3 +1,49 @@
+
+# medspaCy #
+
+## conda Set-Up ##
+
+```
+
+conda create -n ensemble-py3.8 python=3.8
+conda activate ensemble-py3.8
+
+pip install --upgrade pip
+
+pip install -r requirements.txt
+
+```
+
+## SHARP-n Style Annotation Schema ##
+
+Right LE pain
+
+```
+
+<!-- identified annotation -->
+<textsem:IdentifiedAnnotation xmi:id="545" sofa="1" 
+    begin="56" end="69" id="0" 
+    ontologyConceptArr="587" 
+	discoveryTechnique="0" confidence="0.0" 
+	event="569"
+	typeID="0" 
+	polarity="0" uncertainty="0" 
+    conditional="false" generic="false" historyOf="0"
+    />
+
+```
+
+```
+
+<!-- ontologyConceptArr -->
+<refsem:UmlsConcept xmi:id="587"
+    cui="C0564823"
+	score="0.0" 
+	disambiguated="false"
+    />
+
+```
+
 # Voting-ensemble method framework
 
 dependency: [jsoup](https://github.com/jhy/jsoup/releases/tag/jsoup-1.6.2)
