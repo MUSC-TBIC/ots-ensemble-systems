@@ -11,7 +11,7 @@ import cassis
 
 ## TODO - refactor type system creation to be importable from a separate file
 
-def main( args ):
+def main( args , classifiers ):
     ############################
     ## Create a type system
     ## - https://github.com/dkpro/dkpro-cassis/blob/master/cassis/typesystem.py
@@ -119,7 +119,8 @@ def main( args ):
             line = line.strip()
             filenames.append( line )
     ##
-    for filename in tqdm( filenames ):
+    for filename in tqdm( filenames ,
+                          desc = 'Voting (k={})'.format( len( classifiers ) ) ):
         ##
         classifier2id = {}
         id2classifier = {}
@@ -132,7 +133,8 @@ def main( args ):
         ## Grab the discoveryTechnique long names
         for metadata in cas.select( 'refsem.Metadata' ):
             classifier_name , classifier_id = metadata.other.split( '=' )
-            if( classifier_id == '0' ):
+            if( classifier_id == '0' or
+                classifier_id not in classifiers ):
                 continue
             classifier2id[ classifier_name ] = classifier_id
             id2classifier[ classifier_id ] = classifier_name
@@ -150,7 +152,8 @@ def main( args ):
             begin_offset = annot.begin
             end_offset = annot.end
             span = '{}-{}'.format( begin_offset , end_offset )
-            if( technique == '0' ):
+            if( technique == '0' or
+                technique not in classifiers ):
                 continue
             if( span not in kb ):
                 kb[ span ] = {}
@@ -181,12 +184,11 @@ def main( args ):
                                 offset = kb[ span ][ 'begin_offset' ] ,
                                 nlp_system = 'Majority Voting Ensemble System' ,
                                 note_nlp_source_concept_id = cui ,
-                                term_modifiers = 'confidence={}'.format( cui_count / 10 ) )
+                                term_modifiers = 'confidence={}'.format( cui_count / len( classifiers ) ) )
             cas.add_annotation( note_nlp )
         if( args.outputDir is not None ):
             cas.to_xmi( path = os.path.join( args.outputDir , xmi_filename ) ,
                         pretty_print = True )
-
 
 
 if __name__ == '__main__':
@@ -203,6 +205,10 @@ if __name__ == '__main__':
                          default = None ,
                          dest = 'refDir' ,
                          help = 'Output directory for writing the reference CAS XMI files to' )
+    parser.add_argument( '--classifier-list' ,
+                         default = '1234567890' ,
+                         dest = 'classifierList' ,
+                         help = 'List of classifiers (by id) to include' )
     parser.add_argument( '--min-votes' ,
                          default = 1 ,
                          dest = 'minVotes' ,
@@ -226,5 +232,11 @@ if __name__ == '__main__':
                          dest = 'outputDir' ,
                          help = 'Output directory for writing the oracle consolidated CAS XMI files to' )
     args = parser.parse_args()
+    classifiers = []
+    for i in range( 0 , len( args.classifierList ) ):
+        if( args.classifierList[ i ] == '0' ):
+            classifiers.append( '10' )
+        else:
+            classifiers.append( args.classifierList[ i ] )
     args.minVotes = int( args.minVotes )
-    main( args )
+    main( args , classifiers )

@@ -11,7 +11,7 @@ import cassis
 
 ## TODO - refactor type system creation to be importable from a separate file
 
-def main( args ):
+def main( args , classifiers ):
     ############################
     ## Create a type system
     ## - https://github.com/dkpro/dkpro-cassis/blob/master/cassis/typesystem.py
@@ -119,7 +119,8 @@ def main( args ):
             line = line.strip()
             filenames.append( line )
     ##
-    for filename in tqdm( filenames ):
+    for filename in tqdm( filenames ,
+                          desc = 'Oracle' ):
         ##
         classifier2id = {}
         id2classifier = {}
@@ -135,7 +136,8 @@ def main( args ):
         ## Grab the discoveryTechnique long names
         for metadata in cas.select( 'refsem.Metadata' ):
             classifier_name , classifier_id = metadata.other.split( '=' )
-            if( classifier_id == '0' ):
+            if( classifier_id == '0' or
+                classifier_id not in classifiers ):
                 continue
             classifier2id[ classifier_name ] = classifier_id
             id2classifier[ classifier_id ] = classifier_name
@@ -168,7 +170,7 @@ def main( args ):
                                     nlp_system = 'Reference Standard' ,
                                     note_nlp_source_concept_id = cui )
                 ref_cas.add_annotation( note_nlp )
-            else:
+            elif( technique in classifiers ):
                 if( span not in kb ):
                     kb[ span ] = {}
                     kb[ span ][ 'begin_offset' ] = begin_offset
@@ -191,7 +193,7 @@ def main( args ):
                                     offset = kb[ span ][ 'begin_offset' ] ,
                                     nlp_system = 'Oracle Ensemble System' ,
                                     note_nlp_source_concept_id = cui ,
-                                    term_modifiers = 'confidence={}'.format( cui_count / 10 ) )
+                                    term_modifiers = 'confidence={}'.format( cui_count / len( classifiers ) ) )
                 cas.add_annotation( note_nlp )
         if( args.refDir is not None ):
             ref_cas.to_xmi( path = os.path.join( args.refDir , xmi_filename ) ,
@@ -212,6 +214,10 @@ if __name__ == '__main__':
                          required = True ,
                          dest = 'fileList' ,
                          help = 'File containing the basename of all files in order' )
+    parser.add_argument( '--classifier-list' ,
+                         default = '1234567890' ,
+                         dest = 'classifierList' ,
+                         help = 'List of classifiers (by id) to include' )
     parser.add_argument( '--ref-dir' ,
                          default = None ,
                          dest = 'refDir' ,
@@ -221,4 +227,10 @@ if __name__ == '__main__':
                          dest = 'outputDir' ,
                          help = 'Output directory for writing the oracle consolidated CAS XMI files to' )
     args = parser.parse_args()
-    main( args )
+    classifiers = []
+    for i in range( 0 , len( args.classifierList ) ):
+        if( args.classifierList[ i ] == '0' ):
+            classifiers.append( '10' )
+        else:
+            classifiers.append( args.classifierList[ i ] )
+    main( args , classifiers )
