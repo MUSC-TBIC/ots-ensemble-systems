@@ -116,6 +116,10 @@ def main( args , classifiers ):
     ############################
     ## Iterate over the files, covert to CAS, and write the XMI to disk
     filenames = []
+    if( args.fileList is None ):
+        filenames = [ os.path.basename( f ) for f in glob.glob( os.path.join( args.inputDir ,
+                                                                              '*.xmi' ) ) ]
+    else:
     with open( args.fileList , 'r' ) as fp:
         for line in fp:
             line = line.strip()
@@ -128,6 +132,9 @@ def main( args , classifiers ):
         id2classifier = {}
         xmiId2cui = {}
         ##
+        if( args.fileList is None ):
+            xmi_filename = filename
+        else:
         xmi_filename = '{}.xmi'.format( filename )
         with open( os.path.join( args.inputDir , xmi_filename ) , 'rb' ) as fp:
             cas = cassis.load_cas_from_xmi( fp ,
