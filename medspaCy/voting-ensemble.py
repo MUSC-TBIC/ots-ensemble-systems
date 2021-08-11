@@ -120,10 +120,10 @@ def main( args , classifiers ):
         filenames = [ os.path.basename( f ) for f in glob.glob( os.path.join( args.inputDir ,
                                                                               '*.xmi' ) ) ]
     else:
-    with open( args.fileList , 'r' ) as fp:
-        for line in fp:
-            line = line.strip()
-            filenames.append( line )
+        with open( args.fileList , 'r' ) as fp:
+            for line in fp:
+                line = line.strip()
+                filenames.append( line )
     ##
     for filename in tqdm( filenames ,
                           desc = 'Voting (k={})'.format( len( classifiers ) ) ):
@@ -135,7 +135,7 @@ def main( args , classifiers ):
         if( args.fileList is None ):
             xmi_filename = filename
         else:
-        xmi_filename = '{}.xmi'.format( filename )
+            xmi_filename = '{}.xmi'.format( filename )
         with open( os.path.join( args.inputDir , xmi_filename ) , 'rb' ) as fp:
             cas = cassis.load_cas_from_xmi( fp ,
                                             typesystem = typesystem )
@@ -152,48 +152,128 @@ def main( args , classifiers ):
             xmi_id = umls_concept.xmiID
             cui = umls_concept.cui
             xmiId2cui[ xmi_id ] = cui
+        ## For sentence-based annotations, we want to seed the kb with
+        ## all the spans of the sentences
+        if( args.votingUnit == 'sentence' ):
+            kb = {}
+            for sentence in cas.select( 'org.apache.ctakes.typesystem.type.textspan.Sentence' ):
+                begin_offset = sentence.begin
+                end_offset = sentence.end
+                span = '{}-{}'.format( begin_offset , end_offset )
+                kb[ span ] = {}
+                kb[ span ][ 'begin_offset' ] = begin_offset
+                kb[ span ][ 'end_offset' ] = end_offset
+                kb[ span ][ 'norm_counts' ] = {}
+                kb[ span ][ 'norm_weights' ] = {}
+                ## TODO - update when changing how CUI works for sections/sentences
+                kb[ span ][ 'norm_counts' ][ 'section' ] = 0
+                kb[ span ][ 'norm_weights' ][ 'section' ] = 0
+        else:
+            kb = {}
         ## Grab all...
-        kb = {}
         for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
             technique = annot.discoveryTechnique
-            concept_id = int( annot.ontologyConceptArray )
-            cui = xmiId2cui[ concept_id ]
+            ## TODO - refactor variable named 'cui' to reflect
+            ##        more fluid use across annotation types
+            if( args.votingUnit == 'sentence' ):
+                cui = 'section'
+            elif( args.votingUnit == 'span' ):
+                concept_id = int( annot.ontologyConceptArray )
+                cui = xmiId2cui[ concept_id ]
+            else:
+                ## TODO - adapt to context attributes
+                cui = 1
             begin_offset = annot.begin
             end_offset = annot.end
             span = '{}-{}'.format( begin_offset , end_offset )
             if( technique == '0' or
                 technique not in classifiers ):
                 continue
-            if( span not in kb ):
-                kb[ span ] = {}
-                kb[ span ][ 'begin_offset' ] = begin_offset
-                kb[ span ][ 'end_offset' ] = end_offset
-                kb[ span ][ 'norm_counts' ] = {}
-                kb[ span ][ 'norm_weights' ] = {}
-            if( cui not in kb[ span ][ 'norm_counts' ] ):
-                kb[ span ][ 'norm_counts' ][ cui ] = 0
-                kb[ span ][ 'norm_weights' ][ cui ] = 0
-            kb[ span ][ 'norm_counts' ][ cui ] += 1
-            kb[ span ][ 'norm_weights' ][ cui ] += 1
+            if( args.votingUnit == 'span' ):
+                if( span not in kb ):
+                    kb[ span ] = {}
+                    kb[ span ][ 'begin_offset' ] = begin_offset
+                    kb[ span ][ 'end_offset' ] = end_offset
+                    kb[ span ][ 'norm_counts' ] = {}
+                    kb[ span ][ 'norm_weights' ] = {}
+                if( cui not in kb[ span ][ 'norm_counts' ] ):
+                    kb[ span ][ 'norm_counts' ][ cui ] = 0
+                    kb[ span ][ 'norm_weights' ][ cui ] = 0
+                kb[ span ][ 'norm_counts' ][ cui ] += 1
+                kb[ span ][ 'norm_weights' ][ cui ] += 1
+            elif( args.votingUnit == 'sentence' ):
+                if( span in kb ):
+                    weight = 1
+                    kb[ span ][ 'norm_counts' ][ cui ] += 1
+                    kb[ span ][ 'norm_weights' ][ cui ] += weight
+                else:
+                    for ref_span in kb:
+                        if( end_offset < kb[ ref_span ][ 'begin_offset' ] ):
+                            ## span ends before this sentence
+                            continue
+                        if( begin_offset > kb[ ref_span ][ 'end_offset' ] ):
+                            ## span starts after this sentence
+                            continue
+                        if( begin_offset >= kb[ ref_span ][ 'begin_offset' ] and
+                            end_offset <= kb[ ref_span ][ 'end_offset' ] ):
+                            ## span is inside this sentence
+                            weight = 0.5
+                            kb[ ref_span ][ 'norm_counts' ][ cui ] += 1
+                            kb[ ref_span ][ 'norm_weights' ][ cui ] += weight
+                            break
+                        if( begin_offset <= kb[ ref_span ][ 'begin_offset' ] and
+                            end_offset >= kb[ ref_span ][ 'end_offset' ] ):
+                            ## span fully contains this sentence
+                            weight = 1
+                            kb[ ref_span ][ 'norm_counts' ][ cui ] += 1
+                            kb[ ref_span ][ 'norm_weights' ][ cui ] += weight
+                        elif( begin_offset >= kb[ ref_span ][ 'begin_offset' ] and
+                            begin_offset < kb[ ref_span ][ 'end_offset' ] ):
+                            ## span starts inside this sentence
+                            weight = 0.5
+                            kb[ ref_span ][ 'norm_counts' ][ cui ] += 1
+                            kb[ ref_span ][ 'norm_weights' ][ cui ] += weight
+                        elif( end_offset > kb[ ref_span ][ 'begin_offset' ] and
+                              end_offset <= kb[ ref_span ][ 'end_offset' ] ):
+                            ## span ends inside this sentence
+                            weight = 0.5
+                            kb[ ref_span ][ 'norm_counts' ][ cui ] += 1
+                            kb[ ref_span ][ 'norm_weights' ][ cui ] += weight
         ##
         for span in kb:
             max_cui = 'CUI-less'
             max_cui_count = 0
+            ## TODO - allow option to choose CUI based on weighted score
+            if( args.votingUnit == 'sentence' ):
+                max_norm_weights = kb[ span ][ 'norm_weights' ][ 'section' ]
             for cui in kb[ span ][ 'norm_counts' ]:
                 cui_count = kb[ span ][ 'norm_counts' ][ cui ]
                 if( cui_count > max_cui_count and
                     cui_count >= args.minVotes ):
                     max_cui = cui
                     max_cui_count = cui_count
-            if( max_cui_count == 0 and
-                args.zeroStrategy == 'drop' ):
+                    if( args.votingUnit == 'span' ):
+                        max_norm_weights = kb[ span ][ 'norm_weights' ][ cui ]
+            if( args.zeroStrategy == 'drop' and
+                ( ( args.votingUnit == 'span' and max_cui_count == 0 ) or
+                  ( args.votingUnit == 'sentence' and max_norm_weights < args.minVotes ) ) ):
                 continue
-            note_nlp = NoteNlp( begin = kb[ span ][ 'begin_offset' ] ,
-                                end = kb[ span ][ 'end_offset' ] ,
-                                offset = kb[ span ][ 'begin_offset' ] ,
-                                nlp_system = 'Majority Voting Ensemble System' ,
-                                note_nlp_source_concept_id = cui ,
-                                term_modifiers = 'confidence={}'.format( cui_count / len( classifiers ) ) )
+            ## TODO - add special flag to set whether we want to track CUIs or not
+            modifiers = [ 'confidence={}'.format( max_cui_count / len( classifiers ) ) ,
+                          'weighted_confidence={}'.format( max_norm_weights / len( classifiers ) ) ]
+            if( args.votingUnit == 'sentence' ):
+                note_nlp = NoteNlp( begin = kb[ span ][ 'begin_offset' ] ,
+                                    end = kb[ span ][ 'end_offset' ] ,
+                                    offset = kb[ span ][ 'begin_offset' ] ,
+                                    nlp_system = 'Majority Voting Ensemble System' ,
+                                    term_modifiers = ';'.join( modifiers ) )
+            elif( args.votingUnit == 'span' ):
+                note_nlp = NoteNlp( begin = kb[ span ][ 'begin_offset' ] ,
+                                    end = kb[ span ][ 'end_offset' ] ,
+                                    offset = kb[ span ][ 'begin_offset' ] ,
+                                    nlp_system = 'Majority Voting Ensemble System' ,
+                                    note_nlp_source_concept_id = max_cui ,
+                                    term_modifiers = ';'.join( modifiers ) )
             cas.add_annotation( note_nlp )
         if( args.outputDir is not None ):
             cas.to_xmi( path = os.path.join( args.outputDir , xmi_filename ) ,
@@ -229,6 +309,11 @@ if __name__ == '__main__':
                          choices = [ 'drop' , 'CUI-less' ] ,
                          dest = 'zeroStrategy' ,
                          help = 'When no normalizations receives enough votes, use this strategy to select a normalization' )
+    parser.add_argument( '--voting-unit' ,
+                         default = 'span' ,
+                         choices = [ 'span' , 'sentence' , 'doc' ] ,
+                         dest = 'votingUnit' ,
+                         help = 'The unit that accumulates votes: "span" means to treat annotations as their own unit, "sentence" means to converge on all spans matching a sentence, "doc" aggregates all annotations at the document level' )
     parser.add_argument( '--tie-breaker' ,
                          default = 'random' ,
                          choices = [ 'random' , 'ranked' , 'confidenceScore' ] ,
