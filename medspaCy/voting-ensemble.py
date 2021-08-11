@@ -15,9 +15,11 @@ def main( args , classifiers ):
     ############################
     ## Create a type system
     ## - https://github.com/dkpro/dkpro-cassis/blob/master/cassis/typesystem.py
+    with open( os.path.join( args.typesDir , 'Sentence.xml' ) , 'rb' ) as fp:
+        typesystem = cassis.load_typesystem( fp )
+    SentenceAnnotation = typesystem.get_type( 'org.apache.ctakes.typesystem.type.textspan.Sentence' )
     ############
     ## ... for tokens
-    typesystem = cassis.TypeSystem()
     TokenAnnotation = typesystem.create_type( name = 'uima.tt.TokenAnnotation' , 
                                               supertypeName = 'uima.tcas.Annotation' )
     typesystem.add_feature( type_ = TokenAnnotation ,
@@ -193,12 +195,14 @@ def main( args , classifiers ):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser( description = 'Simple voting ensemble system' )
+    parser.add_argument( '--types-dir' ,
+                         dest = 'typesDir' ,
+                         help = 'Directory containing the systems files need to be loaded' )
     parser.add_argument( '--input-dir' ,
                          required = True ,
                          dest = 'inputDir' ,
                          help = 'Input directory containing CAS XMI files' )
-    parser.add_argument( '--file-list' ,
-                         required = True ,
+    parser.add_argument( '--file-list' , default = None ,
                          dest = 'fileList' ,
                          help = 'File containing the basename of all files in order' )
     parser.add_argument( '--ref-dir' ,
