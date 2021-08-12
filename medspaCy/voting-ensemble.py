@@ -130,6 +130,14 @@ def main( args , classifiers ):
             for line in fp:
                 line = line.strip()
                 filenames.append( line )
+    ############################
+    ## Read in the ranked order of classifiers
+    ranked_classifiers = []
+    if( args.rankFile is not None ):
+        with open( args.rankFile , 'r' ) as fp:
+            for line in fp:
+                line = line.strip()
+                ranked_classifiers.append( line )
     ####
     ## Iterate over the files, covert to CAS, and write the XMI to disk
     for filename in tqdm( filenames ,
@@ -161,8 +169,8 @@ def main( args , classifiers ):
             xmiId2cui[ xmi_id ] = cui
         ## For sentence-based annotations, we want to seed the kb with
         ## all the spans of the sentences
+        kb = {}
         if( args.votingUnit == 'sentence' ):
-            kb = {}
             for sentence in cas.select( 'org.apache.ctakes.typesystem.type.textspan.Sentence' ):
                 begin_offset = sentence.begin
                 end_offset = sentence.end
@@ -175,77 +183,148 @@ def main( args , classifiers ):
                 ## TODO - update when changing how CUI works for sections/sentences
                 kb[ span ][ 'norm_counts' ][ 'section' ] = 0
                 kb[ span ][ 'norm_weights' ][ 'section' ] = 0
-        else:
-            kb = {}
+        elif( args.votingUnit == 'span' ):
+            ## For the span-based voting, we want to see the kb with
+            ## the spans of our top ranked classifier. If no rank file
+            ## is given, then we'll just pick the first one provided
+            ## at the command line
+            if( args.rankFile is None ):
+                for classifier_name in classifiers:
+                    if( classifier_name in classifier2id ):
+                        top_classifier_id = classifier2id[ classifier_name ]
+                        break
+            else:
+                for classifier_name in ranked_classifiers:
+                    if( classifier_name in classifier2id ):
+                        top_classifier_id = classifier2id[ classifier_name ]
+                        break
+            for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
+                technique = annot.discoveryTechnique
+                if( technique != top_classifier_id ):
+                    continue
+                begin_offset = annot.begin
+                end_offset = annot.end
+                span = '{}-{}'.format( begin_offset , end_offset )
+                kb[ span ] = {}
+                kb[ span ][ 'begin_offset' ] = begin_offset
+                kb[ span ][ 'end_offset' ] = end_offset
+                kb[ span ][ 'norm_counts' ] = {}
+                kb[ span ][ 'norm_weights' ] = {}
+                try:
+                    concept_id = int( annot.ontologyConceptArray )
+                    cui = xmiId2cui[ concept_id ]
+                except TypeError as e:
+                    ## A TypeError here means occurs when
+                    ## ontologyConceptArray is not defined, meaning
+                    ## that there is no associated CUI
+                    cui = 'span'
+                weight = 1
+                kb[ span ][ 'norm_counts' ][ cui ] = 1
+                kb[ span ][ 'norm_weights' ][ cui ] = weight
         ## Grab all...
         for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
             technique = annot.discoveryTechnique
+            if( technique == '0' or
+                technique not in classifiers or
+                ## We already took care of the top_classifier above
+                ## for span-based voting
+                ( args.votingUnit == 'span' and technique == top_classifier_id ) ):
+                continue
             ## TODO - refactor variable named 'cui' to reflect
             ##        more fluid use across annotation types
             if( args.votingUnit == 'sentence' ):
                 cui = 'section'
             elif( args.votingUnit == 'span' ):
-                concept_id = int( annot.ontologyConceptArray )
-                cui = xmiId2cui[ concept_id ]
+                try:
+                    concept_id = int( annot.ontologyConceptArray )
+                    cui = xmiId2cui[ concept_id ]
+                except TypeError as e:
+                    ## A TypeError here means occurs when
+                    ## ontologyConceptArray is not defined, meaning
+                    ## that there is no associated CUI
+                    cui = 'span'
             else:
                 ## TODO - adapt to context attributes
                 cui = 1
+            ################
             begin_offset = annot.begin
             end_offset = annot.end
             span = '{}-{}'.format( begin_offset , end_offset )
-            if( technique == '0' or
-                technique not in classifiers ):
-                continue
-            if( args.votingUnit == 'span' ):
-                if( span not in kb ):
+            ######################################################
+            if( span in kb ):
+                weight = 1
+                if( cui not in kb[ span ][ 'norm_counts' ] ):
+                    kb[ span ][ 'norm_counts' ][ cui ] = 0
+                    kb[ span ][ 'norm_weights' ][ cui ] = 0
+                kb[ span ][ 'norm_counts' ][ cui ] += 1
+                kb[ span ][ 'norm_weights' ][ cui ] += weight
+            else:
+                ## Try to find any matching spans already registered
+                ## in the kb
+                matched_flag = False
+                for anchor_span in kb:
+                    if( end_offset < kb[ anchor_span ][ 'begin_offset' ] ):
+                        ## span ends before the anchor span
+                        continue
+                    if( begin_offset > kb[ anchor_span ][ 'end_offset' ] ):
+                        ## span starts after the anchor span
+                        continue
+                    if( begin_offset >= kb[ anchor_span ][ 'begin_offset' ] and
+                        end_offset <= kb[ anchor_span ][ 'end_offset' ] ):
+                        ## span is inside the anchor span
+                        weight = 0.5
+                        if( cui not in kb[ span ][ 'norm_counts' ] ):
+                            kb[ span ][ 'norm_counts' ][ cui ] = 0
+                            kb[ span ][ 'norm_weights' ][ cui ] = 0
+                        kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
+                        kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
+                        matched_flag = True
+                        break
+                    if( begin_offset <= kb[ anchor_span ][ 'begin_offset' ] and
+                        end_offset >= kb[ anchor_span ][ 'end_offset' ] ):
+                        ## span fully contains the anchor span
+                        weight = 1
+                        if( cui not in kb[ span ][ 'norm_counts' ] ):
+                            kb[ span ][ 'norm_counts' ][ cui ] = 0
+                            kb[ span ][ 'norm_weights' ][ cui ] = 0
+                        kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
+                        kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
+                        matched_flag = True
+                    elif( begin_offset >= kb[ anchor_span ][ 'begin_offset' ] and
+                          begin_offset < kb[ anchor_span ][ 'end_offset' ] ):
+                        ## span starts inside the anchor span
+                        weight = 0.5
+                        if( cui not in kb[ span ][ 'norm_counts' ] ):
+                            kb[ span ][ 'norm_counts' ][ cui ] = 0
+                            kb[ span ][ 'norm_weights' ][ cui ] = 0
+                        kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
+                        kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
+                        matched_flag = True
+                    elif( end_offset > kb[ anchor_span ][ 'begin_offset' ] and
+                          end_offset <= kb[ anchor_span ][ 'end_offset' ] ):
+                        ## span ends inside the anchor span
+                        weight = 0.5
+                        if( cui not in kb[ span ][ 'norm_counts' ] ):
+                            kb[ span ][ 'norm_counts' ][ cui ] = 0
+                            kb[ span ][ 'norm_weights' ][ cui ] = 0
+                        kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
+                        kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
+                        matched_flag = True
+                    else:
+                        ## How did we get here?
+                        print( '{}\t{}\t{}'.format( filename , span , anchor_span ) )
+                ####
+                ## If we never matched another pre-existing span, then
+                ## add a new anchor span to the kb
+                if( not matched_flag ):
+                    weight = 1
                     kb[ span ] = {}
                     kb[ span ][ 'begin_offset' ] = begin_offset
                     kb[ span ][ 'end_offset' ] = end_offset
                     kb[ span ][ 'norm_counts' ] = {}
                     kb[ span ][ 'norm_weights' ] = {}
-                if( cui not in kb[ span ][ 'norm_counts' ] ):
-                    kb[ span ][ 'norm_counts' ][ cui ] = 0
-                    kb[ span ][ 'norm_weights' ][ cui ] = 0
-                kb[ span ][ 'norm_counts' ][ cui ] += 1
-                kb[ span ][ 'norm_weights' ][ cui ] += 1
-            elif( args.votingUnit == 'sentence' ):
-                if( span in kb ):
-                    weight = 1
-                    kb[ span ][ 'norm_counts' ][ cui ] += 1
-                    kb[ span ][ 'norm_weights' ][ cui ] += weight
-                else:
-                    for ref_span in kb:
-                        if( end_offset < kb[ ref_span ][ 'begin_offset' ] ):
-                            ## span ends before this sentence
-                            continue
-                        if( begin_offset > kb[ ref_span ][ 'end_offset' ] ):
-                            ## span starts after this sentence
-                            continue
-                        if( begin_offset >= kb[ ref_span ][ 'begin_offset' ] and
-                            end_offset <= kb[ ref_span ][ 'end_offset' ] ):
-                            ## span is inside this sentence
-                            weight = 0.5
-                            kb[ ref_span ][ 'norm_counts' ][ cui ] += 1
-                            kb[ ref_span ][ 'norm_weights' ][ cui ] += weight
-                            break
-                        if( begin_offset <= kb[ ref_span ][ 'begin_offset' ] and
-                            end_offset >= kb[ ref_span ][ 'end_offset' ] ):
-                            ## span fully contains this sentence
-                            weight = 1
-                            kb[ ref_span ][ 'norm_counts' ][ cui ] += 1
-                            kb[ ref_span ][ 'norm_weights' ][ cui ] += weight
-                        elif( begin_offset >= kb[ ref_span ][ 'begin_offset' ] and
-                            begin_offset < kb[ ref_span ][ 'end_offset' ] ):
-                            ## span starts inside this sentence
-                            weight = 0.5
-                            kb[ ref_span ][ 'norm_counts' ][ cui ] += 1
-                            kb[ ref_span ][ 'norm_weights' ][ cui ] += weight
-                        elif( end_offset > kb[ ref_span ][ 'begin_offset' ] and
-                              end_offset <= kb[ ref_span ][ 'end_offset' ] ):
-                            ## span ends inside this sentence
-                            weight = 0.5
-                            kb[ ref_span ][ 'norm_counts' ][ cui ] += 1
-                            kb[ ref_span ][ 'norm_weights' ][ cui ] += weight
+                    kb[ span ][ 'norm_counts' ][ cui ] = 1
+                    kb[ span ][ 'norm_weights' ][ cui ] = weight
         ##
         for span in kb:
             max_cui = 'CUI-less'
@@ -307,6 +386,9 @@ if __name__ == '__main__':
                          default = '1234567890' ,
                          dest = 'classifierList' ,
                          help = 'List of classifiers (by id) to include' )
+    parser.add_argument( '--classifier-rank-file' , default = None ,
+                         dest = 'rankFile' ,
+                         help = 'File containing the classifiers ranked in the best to worst performance order (used to break ties)' )
     parser.add_argument( '--min-votes' ,
                          default = 1 ,
                          dest = 'minVotes' ,
@@ -316,6 +398,13 @@ if __name__ == '__main__':
                          choices = [ 'drop' , 'CUI-less' ] ,
                          dest = 'zeroStrategy' ,
                          help = 'When no normalizations receives enough votes, use this strategy to select a normalization' )
+    parser.add_argument( '--overlap-strategy' ,
+                         default = 'rank' ,
+                         ## TODO - support additional strategies
+                         ##choices = [ 'rank' , 'flatten' , 'longest', 'shortest' ] ,
+                         choices = [ 'rank' ] ,
+                         dest = 'overlapStrategy' ,
+                         help = 'Strategy for resolving conflicts of span overlap between annotations when using the span as the voting unit' )
     parser.add_argument( '--voting-unit' ,
                          default = 'span' ,
                          choices = [ 'span' , 'sentence' , 'doc' ] ,
