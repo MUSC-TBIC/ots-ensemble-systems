@@ -10,8 +10,7 @@ import medspacy
 import cassis
 
 ## TODO - refactor type system creation to be importable from a separate file
-
-def main( args , classifiers ):
+def loadTypeSystem( typesDir ):
     ############################
     ## Create a type system
     ## - https://github.com/dkpro/dkpro-cassis/blob/master/cassis/typesystem.py
@@ -113,8 +112,15 @@ def main( args , classifiers ):
                             name = 'term_modifiers' ,
                             description = '' ,
                             rangeTypeName = 'uima.cas.String' )
+    return( typesystem , NoteNlp )
+
+
+def main( args , classifiers ):
     ############################
-    ## Iterate over the files, covert to CAS, and write the XMI to disk
+    typesystem , NoteNlp = loadTypeSystem( args.typesDir )
+    ############################
+    ## Seed the list of files to process either directly from the
+    ## input directory or from the contents of --file-list
     filenames = []
     if( args.fileList is None ):
         filenames = [ os.path.basename( f ) for f in glob.glob( os.path.join( args.inputDir ,
@@ -124,7 +130,8 @@ def main( args , classifiers ):
             for line in fp:
                 line = line.strip()
                 filenames.append( line )
-    ##
+    ####
+    ## Iterate over the files, covert to CAS, and write the XMI to disk
     for filename in tqdm( filenames ,
                           desc = 'Voting (k={})'.format( len( classifiers ) ) ):
         ##
