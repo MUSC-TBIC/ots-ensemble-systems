@@ -51,6 +51,14 @@ def loadTypeSystem( typesDir ):
     IdentifiedAnnotation = typesystem.create_type( name = 'textsem.IdentifiedAnnotation' ,
                                                    supertypeName = 'uima.tcas.Annotation' )
     typesystem.add_feature( type_ = IdentifiedAnnotation ,
+                            name = 'polarity' ,
+                            description = 'Default value of 0. Set to 1 when specifically asserted/positive and -1 when the annotation is "stated with negation"' ,
+                            rangeTypeName = 'uima.cas.Integer' )
+    typesystem.add_feature( type_ = IdentifiedAnnotation ,
+                            name = 'uncertainty' ,
+                            description = 'A 1 for when the annotation is "stated with doubt"; otherwise a 0' ,
+                            rangeTypeName = 'uima.cas.Integer' )
+    typesystem.add_feature( type_ = IdentifiedAnnotation ,
                             name = 'ontologyConceptArray' ,
                             description = 'The xmi:id of the array of ontology concepts associated with this annotation' ,
                             rangeTypeName = 'uima.cas.Integer' )
@@ -102,8 +110,8 @@ def loadTypeSystem( typesDir ):
                             rangeTypeName = 'uima.cas.String' )
     typesystem.add_feature( type_ = NoteNlp ,
                             name = 'term_exists' ,
-                            description = '' ,
-                            rangeTypeName = 'uima.cas.String' )
+                            description = 'Term_exists is defined as a flag that indicates if the patient actually has or had the condition. Any of the following modifiers would make Term_exists false: Negation = true; Subject = [anything other than the patient]; Conditional = true; Rule_out = true; Uncertain = very low certainty or any lower certainties. A complete lack of modifiers would make Term_exists true. For the modifiers that are there, they would have to have these values: Negation = false; Subject = patient; Conditional = false; Rule_out = false; Uncertain = true or high or moderate or even low (could argue about low).' ,
+                            rangeTypeName = 'uima.cas.Boolean' )
     typesystem.add_feature( type_ = NoteNlp ,
                             name = 'term_temporal' ,
                             description = '' ,
@@ -113,6 +121,108 @@ def loadTypeSystem( typesDir ):
                             description = '' ,
                             rangeTypeName = 'uima.cas.String' )
     return( typesystem , NoteNlp )
+
+
+def tallySpannedVotes( cas ,
+                       NoteNlp ,
+                       kb ,
+                       votingUnit ,
+                       minVotes ,
+                       zeroStrategy ):
+    for span in kb:
+        max_cui = 'CUI-less'
+        max_cui_count = 0
+        ## TODO - allow option to choose CUI based on weighted score
+        if( votingUnit == 'sentence' ):
+            max_norm_weights = kb[ span ][ 'norm_weights' ][ 'section' ]
+        for cui in kb[ span ][ 'norm_counts' ]:
+            cui_count = kb[ span ][ 'norm_counts' ][ cui ]
+            if( cui_count > max_cui_count and
+                cui_count >= minVotes ):
+                max_cui = cui
+                max_cui_count = cui_count
+                if( votingUnit == 'span' ):
+                    max_norm_weights = kb[ span ][ 'norm_weights' ][ cui ]
+        if( zeroStrategy == 'drop' and
+            ( ( votingUnit == 'span' and max_cui_count == 0 ) or
+              ( votingUnit == 'sentence' and max_norm_weights < minVotes ) ) ):
+            continue
+        ## TODO - add special flag to set whether we want to track CUIs or not
+        modifiers = [ 'confidence={}'.format( max_cui_count / len( classifiers ) ) ,
+                      'weighted_confidence={}'.format( max_norm_weights / len( classifiers ) ) ]
+        if( votingUnit == 'sentence' ):
+            note_nlp = NoteNlp( begin = kb[ span ][ 'begin_offset' ] ,
+                                end = kb[ span ][ 'end_offset' ] ,
+                                offset = kb[ span ][ 'begin_offset' ] ,
+                                nlp_system = 'Majority Voting Ensemble System' ,
+                                term_modifiers = ';'.join( modifiers ) )
+        elif( votingUnit == 'span' ):
+            note_nlp = NoteNlp( begin = kb[ span ][ 'begin_offset' ] ,
+                                end = kb[ span ][ 'end_offset' ] ,
+                                offset = kb[ span ][ 'begin_offset' ] ,
+                                nlp_system = 'Majority Voting Ensemble System' ,
+                                note_nlp_source_concept_id = max_cui ,
+                                term_modifiers = ';'.join( modifiers ) )
+        cas.add_annotation( note_nlp )
+    return( cas )
+
+
+def tallyDocVotes( cas ,
+                   NoteNlp ,
+                   kb ,
+                   classifiers ,
+                   attribute_list ,
+                   minVotes ,
+                   zeroStrategy ):
+    for concept in kb:
+        ## If a concept doesn't meet the minimum vote threshold, then
+        ## we treate the concept as "not mentioned" (and don't include
+        ## the annotation at all)
+        concept_count = kb[ concept ][ 'norm_counts' ]
+        concept_weight = kb[ concept ][ 'norm_weights' ]
+        ## TODO - should "unmentioned" entries also be tallied here as
+        ##        a counter-proposal to present?
+        if( concept_count < minVotes ):
+            continue
+        ##
+        max_attribute_vals = {}
+        max_attribute_counts = {}
+        for attribute in attribute_list:
+            for attrib_val in kb[ concept ][ attribute ][ 'norm_counts' ]:
+                val_count = kb[ concept ][ attribute ][ 'norm_counts' ][ attrib_val ]
+                if( attribute not in max_attribute_counts ):
+                    max_attribute_vals[ attribute ] = attrib_val
+                    max_attribute_counts[ attribute ] = val_count
+                elif( val_count > max_attribute_counts[ attribute ] ):
+                    max_attribute_vals[ attribute ] = attrib_val
+                    max_attribute_counts[ attribute ] = val_count
+                elif( val_count == max_attribute_counts[ attribute ] ):
+                    ## For ties, we want to treat the most extreme or noticable value
+                    ## as the preferred value.  -1 > 1 > 0
+                    if( ( int( max_attribute_vals[ attribute ] ) == 0 ) or
+                        ( int( max_attribute_vals[ attribute ] ) == 1 and
+                          attrib_val == -1 ) ):
+                        max_attribute_vals[ attribute ] = attrib_val
+                        max_attribute_counts[ attribute ] = val_count
+        modifiers = [ 'confidence={}'.format( int( concept_count ) / len( classifiers ) ) ,
+                      'weighted_confidence={}'.format( int( concept_weight ) / len( classifiers ) ) ]
+        term_exists = True
+        if( 'polarity' in attribute_list ):
+            modifiers.append( 'polarity={}'.format( int( max_attribute_vals[ 'polarity' ] ) ) )
+            if( int( max_attribute_vals[ 'polarity' ] ) == -1 ):
+                term_exists = False
+        if( 'uncertainty' in attribute_list ):
+            modifiers.append( 'uncertainty={}'.format( int( max_attribute_vals[ 'uncertainty' ] ) ) )
+        note_nlp = NoteNlp( begin = 0 ,
+                            end = 0 ,
+                            offset = 0 ,
+                            nlp_system = 'Majority Voting Ensemble System' ,
+                            ## TODO - map this correctly to a CUI
+                            note_nlp_source_concept_id = concept ,
+                            term_exists = term_exists ,
+                            term_modifiers = ';'.join( modifiers ) )
+        cas.add_annotation( note_nlp )
+    return( cas )
 
 
 def main( args , classifiers ):
@@ -138,6 +248,9 @@ def main( args , classifiers ):
             for line in fp:
                 line = line.strip()
                 ranked_classifiers.append( line )
+    ############################
+    ## TODO - programmatically determine the list of attributes to monitor
+    attribute_list = [ 'polarity' , 'uncertainty' ]
     ####
     ## Iterate over the files, covert to CAS, and write the XMI to disk
     for filename in tqdm( filenames ,
@@ -221,6 +334,20 @@ def main( args , classifiers ):
                 weight = 1
                 kb[ span ][ 'norm_counts' ][ cui ] = 1
                 kb[ span ][ 'norm_weights' ][ cui ] = weight
+        elif( args.votingUnit == 'doc' ):
+            for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
+                ## TODO - refactor how we extract the concept name
+                ##        when this is ported to use real CUIs
+                concept = annot.ontologyConceptArray
+                if( concept in kb ):
+                    continue
+                kb[ concept ] = {}
+                kb[ concept ][ 'norm_counts' ] = 0
+                kb[ concept ][ 'norm_weights' ] = 0
+                for attribute in attribute_list:
+                    kb[ concept ][ attribute ] = {}
+                    kb[ concept ][ attribute ][ 'norm_counts' ] = {}
+                    kb[ concept ][ attribute ][ 'norm_weights' ] = {}
         ## Grab all...
         for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
             technique = annot.discoveryTechnique
@@ -243,15 +370,39 @@ def main( args , classifiers ):
                     ## ontologyConceptArray is not defined, meaning
                     ## that there is no associated CUI
                     cui = 'span'
-            else:
-                ## TODO - adapt to context attributes
-                cui = 1
+            elif( args.votingUnit == 'doc' ):
+                ## TODO - refactor how we extract the concept name
+                ##        when this is ported to use real CUIs
+                concept = annot.ontologyConceptArray
             ################
             begin_offset = annot.begin
             end_offset = annot.end
             span = '{}-{}'.format( begin_offset , end_offset )
             ######################################################
-            if( span in kb ):
+            if( args.votingUnit == 'doc' ):
+                attribute_values = {}
+                ####
+                if( 'polarity' in attribute_values ):
+                    attribute_values[ 'polarity' ] = annot.polarity
+                else:
+                    attribute_values[ 'polarity' ] = 0
+                ####
+                if( 'uncertainty' in attribute_values ):
+                    attribute_values[ 'uncertainty' ] = annot.uncertainty
+                else:
+                    attribute_values[ 'uncertainty' ] = 0
+                ####
+                weight = 1
+                kb[ concept ][ 'norm_counts' ] += 1
+                kb[ concept ][ 'norm_weights' ] += weight
+                for attribute in attribute_list:
+                    attrib_val = attribute_values[ attribute ]
+                    if( attrib_val not in kb[ concept ][ attribute ][ 'norm_counts' ] ):
+                        kb[ concept ][ attribute ][ 'norm_counts' ][ attrib_val ] = 0
+                        kb[ concept ][ attribute ][ 'norm_weights' ][ attrib_val ] = 0
+                    kb[ concept ][ attribute ][ 'norm_counts' ][ attrib_val ] += 1
+                    kb[ concept ][ attribute ][ 'norm_weights' ][ attrib_val ] += weight
+            elif( span in kb ):
                 weight = 1
                 if( cui not in kb[ span ][ 'norm_counts' ] ):
                     kb[ span ][ 'norm_counts' ][ cui ] = 0
@@ -325,42 +476,24 @@ def main( args , classifiers ):
                     kb[ span ][ 'norm_weights' ] = {}
                     kb[ span ][ 'norm_counts' ][ cui ] = 1
                     kb[ span ][ 'norm_weights' ][ cui ] = weight
-        ##
-        for span in kb:
-            max_cui = 'CUI-less'
-            max_cui_count = 0
-            ## TODO - allow option to choose CUI based on weighted score
-            if( args.votingUnit == 'sentence' ):
-                max_norm_weights = kb[ span ][ 'norm_weights' ][ 'section' ]
-            for cui in kb[ span ][ 'norm_counts' ]:
-                cui_count = kb[ span ][ 'norm_counts' ][ cui ]
-                if( cui_count > max_cui_count and
-                    cui_count >= args.minVotes ):
-                    max_cui = cui
-                    max_cui_count = cui_count
-                    if( args.votingUnit == 'span' ):
-                        max_norm_weights = kb[ span ][ 'norm_weights' ][ cui ]
-            if( args.zeroStrategy == 'drop' and
-                ( ( args.votingUnit == 'span' and max_cui_count == 0 ) or
-                  ( args.votingUnit == 'sentence' and max_norm_weights < args.minVotes ) ) ):
-                continue
-            ## TODO - add special flag to set whether we want to track CUIs or not
-            modifiers = [ 'confidence={}'.format( max_cui_count / len( classifiers ) ) ,
-                          'weighted_confidence={}'.format( max_norm_weights / len( classifiers ) ) ]
-            if( args.votingUnit == 'sentence' ):
-                note_nlp = NoteNlp( begin = kb[ span ][ 'begin_offset' ] ,
-                                    end = kb[ span ][ 'end_offset' ] ,
-                                    offset = kb[ span ][ 'begin_offset' ] ,
-                                    nlp_system = 'Majority Voting Ensemble System' ,
-                                    term_modifiers = ';'.join( modifiers ) )
-            elif( args.votingUnit == 'span' ):
-                note_nlp = NoteNlp( begin = kb[ span ][ 'begin_offset' ] ,
-                                    end = kb[ span ][ 'end_offset' ] ,
-                                    offset = kb[ span ][ 'begin_offset' ] ,
-                                    nlp_system = 'Majority Voting Ensemble System' ,
-                                    note_nlp_source_concept_id = max_cui ,
-                                    term_modifiers = ';'.join( modifiers ) )
-            cas.add_annotation( note_nlp )
+        #########
+        if( args.votingUnit == 'sentence' or
+            args.votingUnit == 'span' ):
+            cas = tallySpannedVotes( cas ,
+                                     NoteNlp ,
+                                     kb ,
+                                     args.votingUnit ,
+                                     args.minVotes ,
+                                     args.zeroStrategy )
+        elif( args.votingUnit == 'doc' ):
+            cas = tallyDocVotes( cas ,
+                                 NoteNlp ,
+                                 kb ,
+                                 classifiers ,
+                                 attribute_list ,
+                                 args.minVotes ,
+                                 args.zeroStrategy )
+        ################
         if( args.outputDir is not None ):
             cas.to_xmi( path = os.path.join( args.outputDir , xmi_filename ) ,
                         pretty_print = True )
