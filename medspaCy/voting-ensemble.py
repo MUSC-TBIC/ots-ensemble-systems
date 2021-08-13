@@ -293,7 +293,14 @@ def main( args , classifiers ):
                 kb[ span ][ 'end_offset' ] = end_offset
                 kb[ span ][ 'norm_counts' ] = {}
                 kb[ span ][ 'norm_weights' ] = {}
-                ## TODO - update when changing how CUI works for sections/sentences
+                ## TODO - count both the number of times this sentence
+                ##        is tagged as a section *and* how many times
+                ##        it is tagged as a section with a particular
+                ##        header type
+                ## TODO - update when changing how CUI works for
+                ## sections/sentences
+                ## kb[ span ][ 'norm_counts' ][ <Section Type> ] = 0
+                ## kb[ span ][ 'norm_weights' ][ <Section Type> ] = 0
                 kb[ span ][ 'norm_counts' ][ 'section' ] = 0
                 kb[ span ][ 'norm_weights' ][ 'section' ] = 0
         elif( args.votingUnit == 'span' ):
@@ -434,6 +441,8 @@ def main( args , classifiers ):
                     if( begin_offset <= kb[ anchor_span ][ 'begin_offset' ] and
                         end_offset >= kb[ anchor_span ][ 'end_offset' ] ):
                         ## span fully contains the anchor span
+                        ## .RRRR.
+                        ## ..SS..
                         weight = 1
                         if( cui not in kb[ span ][ 'norm_counts' ] ):
                             kb[ span ][ 'norm_counts' ][ cui ] = 0
@@ -444,6 +453,8 @@ def main( args , classifiers ):
                     elif( begin_offset >= kb[ anchor_span ][ 'begin_offset' ] and
                           begin_offset < kb[ anchor_span ][ 'end_offset' ] ):
                         ## span starts inside the anchor span
+                        ## .RRR...
+                        ## ..SSS..
                         weight = 0.5
                         if( cui not in kb[ span ][ 'norm_counts' ] ):
                             kb[ span ][ 'norm_counts' ][ cui ] = 0
@@ -454,6 +465,8 @@ def main( args , classifiers ):
                     elif( end_offset > kb[ anchor_span ][ 'begin_offset' ] and
                           end_offset <= kb[ anchor_span ][ 'end_offset' ] ):
                         ## span ends inside the anchor span
+                        ## ...RRR.
+                        ## ..SSS..
                         weight = 0.5
                         if( cui not in kb[ span ][ 'norm_counts' ] ):
                             kb[ span ][ 'norm_counts' ][ cui ] = 0
@@ -463,11 +476,11 @@ def main( args , classifiers ):
                         matched_flag = True
                     else:
                         ## How did we get here?
-                        print( '{}\t{}\t{}'.format( filename , span , anchor_span ) )
+                        print( 'Error:\t{}\t{}\t{}'.format( filename , span , anchor_span ) )
                 ####
                 ## If we never matched another pre-existing span, then
                 ## add a new anchor span to the kb
-                if( not matched_flag ):
+                if( not matched_flag and args.votingUnit == 'span' ):
                     weight = 1
                     kb[ span ] = {}
                     kb[ span ][ 'begin_offset' ] = begin_offset

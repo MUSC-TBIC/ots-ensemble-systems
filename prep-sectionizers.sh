@@ -32,6 +32,9 @@ mkdir -p ${SYS_DIR}
 
 mkdir -p ${RESULT_DIR}/etude
 
+###########################################################
+## Run individual classifiers
+
 ## Rules-based medspaCy sectionizer
 ${SECTIONIZER_CONDA}/bin/python3 \
     "${SECTIONIZER_DIR}/medspacy/medspaCy_sectionizer.py" \
@@ -48,6 +51,7 @@ ${SECTIONIZER_CONDA}/bin/python3 \
     --model-dir "${MEDSPACY_DIR}_svm_brat5_rbf" \
     --svm-kernel "rbf"
 
+###########################################################
 ## Merge the oracle/reference annotation with the above classifiers to
 ## generate a single input corpus for the meta-classifier ensemble
 ## system to read in
@@ -57,6 +61,9 @@ ${ENSEMBLE_CONDA}/bin/python3 \
     --input-ref-dir "${TEXTRACTOR_DIR}/brat5" \
     --input-sharpn-systems "${CLASSIFIER_OUT}" \
     --output-dir "${MERGED_OUT}"
+
+###########################################################
+## Run voting meta-classifier
 
 export CLASSIFIERS=12
 export MINVOTES=1
@@ -72,6 +79,9 @@ ${ENSEMBLE_CONDA}/bin/python3 \
     --min-vote ${MINVOTES} \
     --zero-strategy drop \
     --output-dir ${SYS_DIR}
+
+###########################################################
+## Score voting ensemble output
 
 export MATCH_FLAG=partial
 
