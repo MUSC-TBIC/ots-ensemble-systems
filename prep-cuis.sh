@@ -10,27 +10,38 @@ export ETUDE_DIR=/Users/pmh/git/etude
 export ETUDE_CONDA=~/opt/anaconda3/envs/etude-py3.7
 export CONFIG_DIR=/Users/pmh/git/etude-engine-configs
 
-export TASK=2008_i2b2_obesity
+export TASK=2019_n2c2_track3
 
-export I2B2_2008_DIR=/Users/pmh/data/i2b2_corpora/2008_i2b2_challenge_obesity
+export N2C2_2019_DIR=/Users/pmh/data/n2c2/2019_n2c2_track-3
 
-## I2B2_2008_DIR
-## |-- obesity_annotations_test.xml
-## |-- obesity_annotations_training.xml
-## |-- obesity_annotations_training2.xml
-## |-- obesity_corpus_test.xml
-## |-- obesity_corpus_training.xml
-## |-- obesity_corpus_training2.xml
-## `-- team_submissions/top_subs
-##     |-- prod_123_0_1_nlpoa00WJ
-##     |-- prod_190_0_1_nlpQF1X7H
-##     `-- prod_204_0_3_nlpB1l4ZH
+## N2C2_2019_DIR
+## |-- train
+## |   |-- train_norm
+## |   `-- train_note
+## |-- test
+## |   |-- test_norm
+## |   |-- test_norm_cui_replaced_with_unk
+## |   `-- test_note
+## `-- top10_outputs
+##     |-- submission_Ali.txt
+##     |-- submission_KP.txt
+##     |-- submission_MDQ.txt
+##     |-- submission_MIT.txt
+##     |-- submission_NaCT.txt
+##     |-- submission_TTI.txt
+##     |-- submission_UAZ.txt
+##     |-- submission_UAv.txt
+##     |-- submission_UWM.txt
+##     `-- submission_ezDI.txt
 
 export RESULT_DIR=/Users/pmh/git/ots-ensemble-systems/data/out
 export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
 
-## RESULT_DIR/2008_i2b2_obesity
-## |-- 2008_i2b2_obesity_results.csv
+echo "Method	Classifiers	Accuracy	Coverage	MinVote" \
+     > ${RESULT_FILE}
+
+## RESULT_DIR/2019_n2c2_track3
+## |-- 2019_n2c2_track3_results.csv
 ## |-- etude
 ## |   |-- voting_1_1.log
 ## |   |-- voting_1_2.log
@@ -63,15 +74,16 @@ mkdir -p ${SYS_DIR}
 ## generate a single input corpus for the meta-classifier ensemble
 ## system to read in
 ${ENSEMBLE_CONDA}/bin/python3 \
-    ${ENSEMBLE_DIR}/medspaCy/i2b2-2008-obesity-converter.py \
-    --input-text ${I2B2_2008_DIR}/obesity_corpus_test.xml \
-    --input-ref ${I2B2_2008_DIR}/obesity_annotations_test.xml \
-    --input-systems ${I2B2_2008_DIR}/team_submissions/top_subs \
+    ${ENSEMBLE_DIR}/medspaCy/n2c2-2019-track3-converter.py \
+    --input-text ${N2C2_2019_DIR}/test/test_note \
+    --input-norm ${N2C2_2019_DIR}/test/test_norm \
+    --input-systems ${N2C2_2019_DIR}/top10_outputs \
+    --file-list ${N2C2_2019_DIR}/test/test_file_list.txt \
     --output-dir ${MERGED_OUT}
 
 export METHOD=voting
 export MINVOTES=1
-for CLASSIFIERS in {1..3}
+for CLASSIFIERS in {0..9}
 do
     export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}
     mkdir -p ${SYS_DIR}
@@ -81,7 +93,7 @@ do
         ${ENSEMBLE_DIR}/medspaCy/voting-ensemble.py \
         --types-dir /Users/pmh/git/ots-ensemble-systems/types \
         --input-dir "${MERGED_OUT}" \
-        --voting-unit doc \
+        --voting-unit span \
         --classifier-list ${CLASSIFIERS} \
         --min-votes ${MINVOTES} \
         --zero-strategy drop \

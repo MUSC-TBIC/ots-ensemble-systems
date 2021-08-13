@@ -310,8 +310,8 @@ def main( args , classifiers ):
             ## at the command line
             if( args.rankFile is None ):
                 for classifier_name in classifiers:
-                    if( classifier_name in classifier2id ):
-                        top_classifier_id = classifier2id[ classifier_name ]
+                    if( classifier_name  in id2classifier ):
+                        top_classifier_id = classifier_name
                         break
             else:
                 for classifier_name in ranked_classifiers:
