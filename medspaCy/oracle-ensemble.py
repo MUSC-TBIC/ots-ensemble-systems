@@ -10,14 +10,15 @@ import medspacy
 import cassis
 
 ## TODO - refactor type system creation to be importable from a separate file
-
-def main( args , classifiers ):
+def loadTypeSystem( typesDir ):
     ############################
     ## Create a type system
     ## - https://github.com/dkpro/dkpro-cassis/blob/master/cassis/typesystem.py
+    with open( os.path.join( typesDir , 'Sentence.xml' ) , 'rb' ) as fp:
+        typesystem = cassis.load_typesystem( fp )
+    SentenceAnnotation = typesystem.get_type( 'org.apache.ctakes.typesystem.type.textspan.Sentence' )
     ############
     ## ... for tokens
-    typesystem = cassis.TypeSystem()
     TokenAnnotation = typesystem.create_type( name = 'uima.tt.TokenAnnotation' , 
                                               supertypeName = 'uima.tcas.Annotation' )
     typesystem.add_feature( type_ = TokenAnnotation ,
@@ -49,6 +50,14 @@ def main( args , classifiers ):
     ## ... for IdentifiedAnnotation
     IdentifiedAnnotation = typesystem.create_type( name = 'textsem.IdentifiedAnnotation' ,
                                                    supertypeName = 'uima.tcas.Annotation' )
+    typesystem.add_feature( type_ = IdentifiedAnnotation ,
+                            name = 'polarity' ,
+                            description = 'Default value of 0. Set to 1 when specifically asserted/positive and -1 when the annotation is "stated with negation"' ,
+                            rangeTypeName = 'uima.cas.Integer' )
+    typesystem.add_feature( type_ = IdentifiedAnnotation ,
+                            name = 'uncertainty' ,
+                            description = 'A 1 for when the annotation is "stated with doubt"; otherwise a 0' ,
+                            rangeTypeName = 'uima.cas.Integer' )
     typesystem.add_feature( type_ = IdentifiedAnnotation ,
                             name = 'ontologyConceptArray' ,
                             description = 'The xmi:id of the array of ontology concepts associated with this annotation' ,
@@ -101,8 +110,8 @@ def main( args , classifiers ):
                             rangeTypeName = 'uima.cas.String' )
     typesystem.add_feature( type_ = NoteNlp ,
                             name = 'term_exists' ,
-                            description = '' ,
-                            rangeTypeName = 'uima.cas.String' )
+                            description = 'Term_exists is defined as a flag that indicates if the patient actually has or had the condition. Any of the following modifiers would make Term_exists false: Negation = true; Subject = [anything other than the patient]; Conditional = true; Rule_out = true; Uncertain = very low certainty or any lower certainties. A complete lack of modifiers would make Term_exists true. For the modifiers that are there, they would have to have these values: Negation = false; Subject = patient; Conditional = false; Rule_out = false; Uncertain = true or high or moderate or even low (could argue about low).' ,
+                            rangeTypeName = 'uima.cas.Boolean' )
     typesystem.add_feature( type_ = NoteNlp ,
                             name = 'term_temporal' ,
                             description = '' ,
@@ -111,6 +120,12 @@ def main( args , classifiers ):
                             name = 'term_modifiers' ,
                             description = '' ,
                             rangeTypeName = 'uima.cas.String' )
+    return( typesystem , NoteNlp )
+
+
+def main( args , classifiers ):
+    ############################
+    typesystem , NoteNlp = loadTypeSystem( args.typesDir )
     ############################
     ## Iterate over the files, covert to CAS, and write the XMI to disk
     filenames = []

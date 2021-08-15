@@ -14,7 +14,7 @@ def loadTypeSystem( typesDir ):
     ############################
     ## Create a type system
     ## - https://github.com/dkpro/dkpro-cassis/blob/master/cassis/typesystem.py
-    with open( os.path.join( args.typesDir , 'Sentence.xml' ) , 'rb' ) as fp:
+    with open( os.path.join( typesDir , 'Sentence.xml' ) , 'rb' ) as fp:
         typesystem = cassis.load_typesystem( fp )
     SentenceAnnotation = typesystem.get_type( 'org.apache.ctakes.typesystem.type.textspan.Sentence' )
     ############
