@@ -389,12 +389,12 @@ def main( args , classifiers ):
             if( args.votingUnit == 'doc' ):
                 attribute_values = {}
                 ####
-                if( 'polarity' in attribute_values ):
+                if( 'polarity' in attribute_list ):
                     attribute_values[ 'polarity' ] = annot.polarity
                 else:
                     attribute_values[ 'polarity' ] = 0
                 ####
-                if( 'uncertainty' in attribute_values ):
+                if( 'uncertainty' in attribute_list ):
                     attribute_values[ 'uncertainty' ] = annot.uncertainty
                 else:
                     attribute_values[ 'uncertainty' ] = 0

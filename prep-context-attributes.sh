@@ -29,6 +29,9 @@ export I2B2_2008_DIR=/Users/pmh/data/i2b2_corpora/2008_i2b2_challenge_obesity
 export RESULT_DIR=/Users/pmh/git/ots-ensemble-systems/data/out
 export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
 
+echo "Method	Classifiers	Type	Accuracy	TP	FP	FN	TN	MinVote" \
+     > ${RESULT_FILE}
+
 ## RESULT_DIR/2008_i2b2_obesity
 ## |-- 2008_i2b2_obesity_results.csv
 ## |-- etude
@@ -53,6 +56,9 @@ export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
 export MERGED_OUT=${RESULT_DIR}/${TASK}/merged
 mkdir -p "${MERGED_OUT}"
 
+export REF_DIR=${RESULT_DIR}/${TASK}/ref
+mkdir -p "${REF_DIR}"
+
 mkdir -p ${RESULT_DIR}/${TASK}/etude
 
 export METHOD=voting
@@ -69,6 +75,14 @@ ${ENSEMBLE_CONDA}/bin/python3 \
     --input-systems ${I2B2_2008_DIR}/team_submissions/top_subs \
     --output-dir ${MERGED_OUT}
 
+## Create an reference corpus in the same format
+${ENSEMBLE_CONDA}/bin/python3 \
+    ${ENSEMBLE_DIR}/medspaCy/oracle-ensemble.py \
+    --types-dir ${ENSEMBLE_DIR}/types \
+    --input-dir "${MERGED_OUT}" \
+    --voting-unit doc \
+    --ref-dir ${REF_DIR}
+
 export METHOD=voting
 export MINVOTES=1
 for CLASSIFIERS in {1..3}
@@ -79,11 +93,39 @@ do
     ## Simple voting ensemble system
     ${ENSEMBLE_CONDA}/bin/python3 \
         ${ENSEMBLE_DIR}/medspaCy/voting-ensemble.py \
-        --types-dir /Users/pmh/git/ots-ensemble-systems/types \
+        --types-dir ${ENSEMBLE_DIR}/types \
         --input-dir "${MERGED_OUT}" \
         --voting-unit doc \
         --classifier-list ${CLASSIFIERS} \
         --min-votes ${MINVOTES} \
         --zero-strategy drop \
         --output-dir ${SYS_DIR}
+
+    ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
+      --reference-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
+      --reference-input ${REF_DIR} \
+      --test-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
+      --test-input ${SYS_DIR} \
+      --file-suffix "3.xmi" \
+      --fuzzy-match-flags exact \
+      --metrics Accuracy TP FP FN TN \
+      --by-type \
+      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log
+
+    ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
+      --reference-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
+      --reference-input ${REF_DIR} \
+      --test-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
+      --test-input ${SYS_DIR} \
+      --file-suffix "3.xmi" \
+      --fuzzy-match-flags exact \
+      --metrics Accuracy TP FP FN TN \
+      --by-type \
+      --score-key Parent \
+      >> ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log
+
+    for i in `egrep -v "^(micro|macro|exact)" ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | tr '\t' '|'`;do
+	echo "${METHOD}	${CLASSIFIERS}	`echo $i | tr '|' '\t'`" \
+	>> ${RESULT_FILE};done
+
 done

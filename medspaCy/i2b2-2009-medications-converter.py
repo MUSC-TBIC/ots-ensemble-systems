@@ -41,6 +41,8 @@ def process_line( note_contents , line ):
             try:
                 end_token_offset = len( line_tokens[ begin_tok ] )
             except IndexError as e:
+                ## TODO - Error on line:
+                ## m="famciclovir" 75:9 75:9
                 print( '{}\t{}\t{}'.format( line , line_tokens , begin_tok ) )
         else:
             end_token_offset = len( ' '.join( line_tokens[ begin_tok:( end_tok + 1 ) ] ) )
@@ -194,6 +196,8 @@ def main( args ):
             with open( team_filename , 'r' ) as team_fp:
                 for line in team_fp:
                     line = line.strip()
+                    if( line == '' ):
+                        continue
                     begin_offset , end_offset = process_line( note_contents , line )
                     if( begin_offset > -1 ):
                         identified_annotation = IdentifiedAnnotation( begin = begin_offset ,
