@@ -3,6 +3,8 @@ import glob
 import os
 import re
 
+import logging as log
+
 from tqdm import tqdm
 
 import spacy
@@ -43,7 +45,7 @@ def process_line( note_contents , line ):
             except IndexError as e:
                 ## TODO - Error on line:
                 ## m="famciclovir" 75:9 75:9
-                print( '{}\t{}\t{}'.format( line , line_tokens , begin_tok ) )
+                log.error( 'IndexError in line. begin_tok={} while len( line_tokens )={}'.format( begin_tok , len( line_tokens ) ) )
         else:
             end_token_offset = len( ' '.join( line_tokens[ begin_tok:( end_tok + 1 ) ] ) )
     else:
@@ -223,6 +225,15 @@ if __name__ == '__main__':
                          dest = 'outputDir' ,
                          help = 'Output directory for writing CAS XMI files to' )
     args = parser.parse_args()
+    ## Set up logging
+    if args.verbose:
+        log.basicConfig( format = "%(levelname)s: %(message)s" ,
+                         level = log.DEBUG )
+        log.info( "Verbose output." )
+        log.debug( "{}".format( args ) )
+    else:
+        log.basicConfig( format="%(levelname)s: %(message)s" )
+    ####
     if( not os.path.exists( args.outputDir ) ):
         try:
             os.makedirs( args.outputDir )

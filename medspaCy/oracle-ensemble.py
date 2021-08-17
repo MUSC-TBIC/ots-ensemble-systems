@@ -211,6 +211,7 @@ def main( args , classifiers ):
             for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
                 technique = annot.discoveryTechnique
                 if( technique == 0 or
+                    classifiers is None or
                     technique not in classifiers ):
                     continue
                 ## TODO - we only support exact match oracle merging
@@ -414,10 +415,10 @@ if __name__ == '__main__':
                          default = None ,
                          dest = 'fileList' ,
                          help = 'File containing the basename of all files in order' )
-    parser.add_argument( '--classifier-list' ,
-                         default = None , ##'1234567890' ,
+    parser.add_argument( '--classifier-list' , nargs = '+' ,
+                         default = None ,
                          dest = 'classifierList' ,
-                         help = 'List of classifiers (by id) to include' )
+                         help = 'List of classifiers (space separated and by numerical id) to include' )
     parser.add_argument( '--voting-unit' ,
                          default = 'span' ,
                          choices = [ 'span' , 'doc' ] ,
@@ -432,11 +433,4 @@ if __name__ == '__main__':
                          dest = 'outputDir' ,
                          help = 'Output directory for writing the oracle consolidated CAS XMI files to' )
     args = parser.parse_args()
-    classifiers = []
-    if( args.classifierList is not None ):
-        for i in range( 0 , len( args.classifierList ) ):
-            if( args.classifierList[ i ] == '0' ):
-                classifiers.append( '10' )
-            else:
-                classifiers.append( args.classifierList[ i ] )
-    main( args , classifiers )
+    main( args , args.classifierList )

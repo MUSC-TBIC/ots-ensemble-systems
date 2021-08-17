@@ -3,6 +3,8 @@ import glob
 import os
 import re
 
+import logging as log
+
 from tqdm import tqdm
 
 import spacy
@@ -126,6 +128,7 @@ def loadTypeSystem( typesDir ):
 def tallySpannedVotes( cas ,
                        NoteNlp ,
                        kb ,
+                       classifiers ,
                        votingUnit ,
                        minVotes ,
                        zeroStrategy ):
@@ -308,16 +311,25 @@ def main( args , classifiers ):
             ## the spans of our top ranked classifier. If no rank file
             ## is given, then we'll just pick the first one provided
             ## at the command line
+            top_classifier_id = None
+            provided_classifiers = None
             if( args.rankFile is None ):
+                provided_classifiers = ', '.join( classifiers )
                 for classifier_name in classifiers:
                     if( classifier_name  in id2classifier ):
                         top_classifier_id = classifier_name
                         break
             else:
+                provided_classifiers = ', '.join( ranked_classifiers )
                 for classifier_name in ranked_classifiers:
                     if( classifier_name in classifier2id ):
                         top_classifier_id = classifier2id[ classifier_name ]
                         break
+            if( top_classifier_id is None ):
+                ## TODO - provide option to not write a file if not classifiers available to vote
+                log.warning( 'File \'{}\' does not contain any annotations matching the provided list of classifiers ({})'.format( filename ,
+                                                                                                                                   provided_classifiers ) )
+                continue
             for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
                 technique = annot.discoveryTechnique
                 if( technique != top_classifier_id ):
@@ -476,7 +488,9 @@ def main( args , classifiers ):
                         matched_flag = True
                     else:
                         ## How did we get here?
-                        print( 'Error:\t{}\t{}\t{}'.format( filename , span , anchor_span ) )
+                        log.error( 'Somehow span {} and reference span {} are neither a match nor mismatch in file \'{}\''.format( span ,
+                                                                                                                                   anchor_span ,
+                                                                                                                                   filename ) )
                 ####
                 ## If we never matched another pre-existing span, then
                 ## add a new anchor span to the kb
@@ -495,6 +509,7 @@ def main( args , classifiers ):
             cas = tallySpannedVotes( cas ,
                                      NoteNlp ,
                                      kb ,
+                                     classifiers ,
                                      args.votingUnit ,
                                      args.minVotes ,
                                      args.zeroStrategy )
@@ -514,6 +529,9 @@ def main( args , classifiers ):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser( description = 'Simple voting ensemble system' )
+    parser.add_argument( '-v' , '--verbose' ,
+                         help = "Log at the DEBUG level" ,
+                         action = "store_true" )
     parser.add_argument( '--types-dir' ,
                          dest = 'typesDir' ,
                          help = 'Directory containing the systems files need to be loaded' )
@@ -528,10 +546,10 @@ if __name__ == '__main__':
                          default = None ,
                          dest = 'refDir' ,
                          help = 'Output directory for writing the reference CAS XMI files to' )
-    parser.add_argument( '--classifier-list' ,
-                         default = '1234567890' ,
+    parser.add_argument( '--classifier-list' , nargs = '+' ,
+                         default = None ,
                          dest = 'classifierList' ,
-                         help = 'List of classifiers (by id) to include' )
+                         help = 'List of classifiers (space separated and by numerical id) to include' )
     parser.add_argument( '--classifier-rank-file' , default = None ,
                          dest = 'rankFile' ,
                          help = 'File containing the classifiers ranked in the best to worst performance order (used to break ties)' )
@@ -570,11 +588,14 @@ if __name__ == '__main__':
                          dest = 'outputDir' ,
                          help = 'Output directory for writing the oracle consolidated CAS XMI files to' )
     args = parser.parse_args()
-    classifiers = []
-    for i in range( 0 , len( args.classifierList ) ):
-        if( args.classifierList[ i ] == '0' ):
-            classifiers.append( '10' )
-        else:
-            classifiers.append( args.classifierList[ i ] )
+    ## Set up logging
+    if args.verbose:
+        log.basicConfig( format = "%(levelname)s: %(message)s" ,
+                         level = log.DEBUG )
+        log.info( "Verbose output." )
+        log.debug( "{}".format( args ) )
+    else:
+        log.basicConfig( format="%(levelname)s: %(message)s" )
+    ##
     args.minVotes = int( args.minVotes )
-    main( args , classifiers )
+    main( args , args.classifierList )

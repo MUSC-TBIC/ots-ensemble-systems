@@ -96,7 +96,7 @@ ${ENSEMBLE_CONDA}/bin/python3 \
 
 export METHOD=voting
 export MINVOTES=1
-for CLASSIFIERS in {0..9}
+for CLASSIFIERS in {1..10}
 do
 
     export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}
