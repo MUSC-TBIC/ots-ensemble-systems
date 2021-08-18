@@ -443,9 +443,9 @@ def main( args , classifiers ):
                         end_offset <= kb[ anchor_span ][ 'end_offset' ] ):
                         ## span is inside the anchor span
                         weight = 0.5
-                        if( cui not in kb[ span ][ 'norm_counts' ] ):
-                            kb[ span ][ 'norm_counts' ][ cui ] = 0
-                            kb[ span ][ 'norm_weights' ][ cui ] = 0
+                        if( cui not in kb[ anchor_span ][ 'norm_counts' ] ):
+                            kb[ anchor_span ][ 'norm_counts' ][ cui ] = 0
+                            kb[ anchor_span ][ 'norm_weights' ][ cui ] = 0
                         kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
                         kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
                         matched_flag = True
@@ -456,9 +456,9 @@ def main( args , classifiers ):
                         ## .RRRR.
                         ## ..SS..
                         weight = 1
-                        if( cui not in kb[ span ][ 'norm_counts' ] ):
-                            kb[ span ][ 'norm_counts' ][ cui ] = 0
-                            kb[ span ][ 'norm_weights' ][ cui ] = 0
+                        if( cui not in kb[ anchor_span ][ 'norm_counts' ] ):
+                            kb[ anchor_span ][ 'norm_counts' ][ cui ] = 0
+                            kb[ anchor_span ][ 'norm_weights' ][ cui ] = 0
                         kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
                         kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
                         matched_flag = True
@@ -468,9 +468,9 @@ def main( args , classifiers ):
                         ## .RRR...
                         ## ..SSS..
                         weight = 0.5
-                        if( cui not in kb[ span ][ 'norm_counts' ] ):
-                            kb[ span ][ 'norm_counts' ][ cui ] = 0
-                            kb[ span ][ 'norm_weights' ][ cui ] = 0
+                        if( cui not in kb[ anchor_span ][ 'norm_counts' ] ):
+                            kb[ anchor_span ][ 'norm_counts' ][ cui ] = 0
+                            kb[ anchor_span ][ 'norm_weights' ][ cui ] = 0
                         kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
                         kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
                         matched_flag = True
@@ -480,9 +480,9 @@ def main( args , classifiers ):
                         ## ...RRR.
                         ## ..SSS..
                         weight = 0.5
-                        if( cui not in kb[ span ][ 'norm_counts' ] ):
-                            kb[ span ][ 'norm_counts' ][ cui ] = 0
-                            kb[ span ][ 'norm_weights' ][ cui ] = 0
+                        if( cui not in kb[ anchor_span ][ 'norm_counts' ] ):
+                            kb[ anchor_span ][ 'norm_counts' ][ cui ] = 0
+                            kb[ anchor_span ][ 'norm_weights' ][ cui ] = 0
                         kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
                         kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
                         matched_flag = True
@@ -598,4 +598,17 @@ if __name__ == '__main__':
         log.basicConfig( format="%(levelname)s: %(message)s" )
     ##
     args.minVotes = int( args.minVotes )
+    ## In order to support quoted and unquoted classifier lists, we'll
+    ## check if there is a single argument and it contains a space. If
+    ## so, we can assume it is safe to explode the first arg and
+    ## create a list from that:
+    ##
+    ## --classifier-list 1 2 3
+    ##     vs.
+    ## --classifier-list "1 2 3"
+    if( args.classifierList is not None and
+        len( args.classifierList ) == 1 and
+        ' ' in args.classifierList[ 0 ] ):
+        args.classifierList = args.classifierList[ 0 ].split()
+    ####
     main( args , args.classifierList )

@@ -3,6 +3,8 @@ import glob
 import os
 import re
 
+import logging as log
+
 from tqdm import tqdm
 
 import spacy
@@ -214,6 +216,9 @@ def main( args , classifiers ):
                     classifiers is None or
                     technique not in classifiers ):
                     continue
+                begin_offset = annot.begin
+                end_offset = annot.end
+                span = '{}-{}'.format( begin_offset , end_offset )
                 ## TODO - we only support exact match oracle merging
                 if( span in oracle_kb ):
                     weight = 1
@@ -292,6 +297,7 @@ def main( args , classifiers ):
             for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
                 technique = annot.discoveryTechnique
                 if( technique == '0' or
+                    classifiers is None or
                     technique not in classifiers ):
                     continue
                 ## TODO - refactor how we extract the concept name
@@ -404,6 +410,9 @@ def main( args , classifiers ):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser( description = 'Simple oracle ensemble system' )
+    parser.add_argument( '-v' , '--verbose' ,
+                         help = "Log at the DEBUG level" ,
+                         action = "store_true" )
     parser.add_argument( '--types-dir' ,
                          dest = 'typesDir' ,
                          help = 'Directory containing the systems files need to be loaded' )
@@ -433,4 +442,25 @@ if __name__ == '__main__':
                          dest = 'outputDir' ,
                          help = 'Output directory for writing the oracle consolidated CAS XMI files to' )
     args = parser.parse_args()
+    ## Set up logging
+    if args.verbose:
+        log.basicConfig( format = "%(levelname)s: %(message)s" ,
+                         level = log.DEBUG )
+        log.info( "Verbose output." )
+        log.debug( "{}".format( args ) )
+    else:
+        log.basicConfig( format="%(levelname)s: %(message)s" )
+    ## In order to support quoted and unquoted classifier lists, we'll
+    ## check if there is a single argument and it contains a space. If
+    ## so, we can assume it is safe to explode the first arg and
+    ## create a list from that:
+    ##
+    ## --classifier-list 1 2 3
+    ##     vs.
+    ## --classifier-list "1 2 3"
+    if( args.classifierList is not None and
+        len( args.classifierList ) == 1 and
+        ' ' in args.classifierList[ 0 ] ):
+        args.classifierList = args.classifierList[ 0 ].split()
+    ####
     main( args , args.classifierList )

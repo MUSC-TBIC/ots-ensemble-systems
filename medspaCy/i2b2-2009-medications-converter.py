@@ -212,6 +212,9 @@ def main( args ):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser( description = 'Simple spaCy pipeline for converting i2b2 2009 medications challenge to CAS XMI files with a SHARP-n schema' )
+    parser.add_argument( '-v' , '--verbose' ,
+                         help = "Log at the DEBUG level" ,
+                         action = "store_true" )
     parser.add_argument( '--input-text' ,
                          dest = 'inputTextDir' ,
                          help = 'Input directory containing plain text files' )
