@@ -250,7 +250,11 @@ def main( args , classifiers ):
         with open( args.rankFile , 'r' ) as fp:
             for line in fp:
                 line = line.strip()
-                ranked_classifiers.append( line )
+                cols = line.split( '\t' )
+                ## If a header line exists, skip it
+                if( cols[ 0 ] == 'Classifier' ):
+                    continue
+                ranked_classifiers.append( cols[ 0 ] )
     ############################
     ## TODO - programmatically determine the list of attributes to monitor
     attribute_list = [ 'polarity' , 'uncertainty' ]
