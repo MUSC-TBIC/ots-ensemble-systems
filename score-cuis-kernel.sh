@@ -4,6 +4,7 @@ if [[ -z $CLASSIFIERS ]]; then
     echo "The variable \$CLASSIFIERS is not set"
     exit 0
 fi
+export SAFE_CLASSIFIERS=`echo $CLASSIFIERS | tr ' ' '-'`
 
 if [[ -z $MAXVOTES ]]; then
     echo "The variable \$MAXVOTES is not set"
@@ -12,8 +13,6 @@ fi
 
 ## Most, if not all, of these environment variables will need to be
 ## customized to match your running environment.
-export SECTIONIZER_DIR=/Users/pmh/git/ots-clinical-sectionizer
-export SECTIONIZER_CONDA=~/opt/anaconda3/envs/sections-py3.8
 export ENSEMBLE_DIR=/Users/pmh/git/ots-ensemble-systems
 export ENSEMBLE_CONDA=~/opt/anaconda3/envs/ensemble-py3.8
 export ETUDE_DIR=/Users/pmh/git/etude
@@ -44,7 +43,7 @@ export N2C2_2019_DIR=/Users/pmh/data/n2c2/2019_n2c2_track-3
 ##     |-- submission_UWM.txt
 ##     `-- submission_ezDI.txt
 
-export RESULT_DIR=/Users/pmh/git/ots-ensemble-systems/data/out
+export RESULT_DIR=${ENSEMBLE_DIR}/data/out
 export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
 
 ## RESULT_DIR/2019_n2c2_track3
@@ -72,7 +71,7 @@ export MERGED_OUT=${RESULT_DIR}/${TASK}/merged
 export REF_DIR=${RESULT_DIR}/${TASK}/ref
 
 export METHOD=oracle
-export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${CLASSIFIERS}
+export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${SAFE_CLASSIFIERS}
 mkdir -p ${SYS_DIR}
 
 export MINVOTES=1
@@ -80,7 +79,7 @@ export MINVOTES=1
 ## Create an oracle of best possible output
 ${ENSEMBLE_CONDA}/bin/python3 \
     ${ENSEMBLE_DIR}/medspaCy/oracle-ensemble.py \
-    --types-dir /Users/pmh/git/ots-ensemble-systems/types \
+    --types-dir ${ENSEMBLE_DIR}/types \
     --input-dir "${MERGED_OUT}" \
     --classifier-list ${CLASSIFIERS} \
     --voting-unit span \
@@ -95,10 +94,10 @@ ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
     --fuzzy-match-flags exact \
     --score-normalization note_nlp_source_concept_id \
     --metrics Accuracy TP FP FN TN \
-    > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log
+    > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log
 
-export COVERAGE=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | cut -f 2 | head -n 1 | tr '\n' '\t'`
-export ACCURACY=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | cut -f 2 | tail -n 1 | tr '\n' '\t'`
+export COVERAGE=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log | cut -f 2 | head -n 1 | tr '\n' '\t'`
+export ACCURACY=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log | cut -f 2 | tail -n 1 | tr '\n' '\t'`
     
 echo "${METHOD}	${CLASSIFIERS}	${ACCURACY}${COVERAGE}${MINVOTES}" \
      >> ${RESULT_FILE}
@@ -108,13 +107,13 @@ export METHOD=voting
 for MINVOTES in {1..${MAXVOTES}}
 do
 
-    export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}
+    export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${SAFE_CLASSIFIERS}
     mkdir -p ${SYS_DIR}
     
     ## Simple voting ensemble system
     ${ENSEMBLE_CONDA}/bin/python3 \
         ${ENSEMBLE_DIR}/medspaCy/voting-ensemble.py \
-        --types-dir /Users/pmh/git/ots-ensemble-systems/types \
+        --types-dir ${ENSEMBLE_DIR}/types \
         --input-dir "${MERGED_OUT}" \
         --voting-unit span \
         --classifier-list ${CLASSIFIERS} \
@@ -131,10 +130,10 @@ do
       --fuzzy-match-flags exact \
       --score-normalization note_nlp_source_concept_id \
       --metrics Accuracy TP FP FN TN \
-      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log
+      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log
 
-    export COVERAGE=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | cut -f 2 | head -n 1 | tr '\n' '\t'`
-    export ACCURACY=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | cut -f 2 | tail -n 1 | tr '\n' '\t'`
+    export COVERAGE=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log | cut -f 2 | head -n 1 | tr '\n' '\t'`
+    export ACCURACY=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log | cut -f 2 | tail -n 1 | tr '\n' '\t'`
     
     echo "${METHOD}	${CLASSIFIERS}	${ACCURACY}${COVERAGE}${MINVOTES}" \
         >> ${RESULT_FILE}

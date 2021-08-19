@@ -2,8 +2,6 @@
 
 ## Most, if not all, of these environment variables will need to be
 ## customized to match your running environment.
-export SECTIONIZER_DIR=/Users/pmh/git/ots-clinical-sectionizer
-export SECTIONIZER_CONDA=~/opt/anaconda3/envs/sections-py3.8
 export ENSEMBLE_DIR=/Users/pmh/git/ots-ensemble-systems
 export ENSEMBLE_CONDA=~/opt/anaconda3/envs/ensemble-py3.8
 export ETUDE_DIR=/Users/pmh/git/etude
@@ -26,8 +24,10 @@ export I2B2_2008_DIR=/Users/pmh/data/i2b2_corpora/2008_i2b2_challenge_obesity
 ##     |-- prod_190_0_1_nlpQF1X7H
 ##     `-- prod_204_0_3_nlpB1l4ZH
 
-export RESULT_DIR=/Users/pmh/git/ots-ensemble-systems/data/out
+export RESULT_DIR=${ENSEMBLE_DIR}/data/out
 export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
+
+mkdir -p "${RESULT_DIR}/${TASK}"
 
 echo "Method	Classifiers	Type	Accuracy	TP	FP	FN	TN	MinVote" \
      > ${RESULT_FILE}
@@ -106,7 +106,7 @@ do
       --reference-input ${REF_DIR} \
       --test-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
       --test-input ${SYS_DIR} \
-      --file-suffix "3.xmi" \
+      --file-suffix ".xmi" \
       --fuzzy-match-flags exact \
       --metrics Accuracy TP FP FN TN \
       --by-type \
@@ -117,7 +117,7 @@ do
       --reference-input ${REF_DIR} \
       --test-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
       --test-input ${SYS_DIR} \
-      --file-suffix "3.xmi" \
+      --file-suffix ".xmi" \
       --fuzzy-match-flags exact \
       --metrics Accuracy TP FP FN TN \
       --by-type \
@@ -125,7 +125,7 @@ do
       >> ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log
 
     for i in `egrep -v "^(micro|macro|exact)" ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | tr '\t' '|'`;do
-	echo "${METHOD}	${CLASSIFIERS}	`echo $i | tr '|' '\t'`" \
+	echo "${METHOD}	${CLASSIFIERS}	`echo $i | tr '|' '\t'`	${MINVOTES}" \
 	>> ${RESULT_FILE};done
 
 done

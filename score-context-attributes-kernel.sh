@@ -13,17 +13,15 @@ fi
 
 ## Most, if not all, of these environment variables will need to be
 ## customized to match your running environment.
-export SECTIONIZER_DIR=/Users/pmh/git/ots-clinical-sectionizer
-export SECTIONIZER_CONDA=~/opt/anaconda3/envs/sections-py3.8
 export ENSEMBLE_DIR=/Users/pmh/git/ots-ensemble-systems
 export ENSEMBLE_CONDA=~/opt/anaconda3/envs/ensemble-py3.8
 export ETUDE_DIR=/Users/pmh/git/etude
 export ETUDE_CONDA=~/opt/anaconda3/envs/etude-py3.7
 export CONFIG_DIR=/Users/pmh/git/etude-engine-configs
 
-export TASK=2009_i2b2_medications
+export TASK=2008_i2b2_obesity
 
-export I2B2_2009_DIR=/Users/pmh/data/i2b2_corpora/2009_i2b2_challenge_medications
+export I2B2_2008_DIR=/Users/pmh/data/i2b2_corpora/2008_i2b2_challenge_obesity
 
 ## I2B2_2008_DIR
 ## |-- obesity_annotations_test.xml
@@ -40,11 +38,8 @@ export I2B2_2009_DIR=/Users/pmh/data/i2b2_corpora/2009_i2b2_challenge_medication
 export RESULT_DIR=${ENSEMBLE_DIR}/data/out
 export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
 
-echo "Method	Classifiers	MatchFlag	Recall	Precision	F1	MinVote" \
-     > ${RESULT_FILE}
-
-## RESULT_DIR/2009_i2b2_medications
-## |-- 2009_i2b2_medications_results.csv
+## RESULT_DIR/2008_i2b2_obesity
+## |-- 2008_i2b2_obesity_results.csv
 ## |-- etude
 ## |   |-- voting_1_1.log
 ## |   |-- voting_1_2.log
@@ -76,29 +71,39 @@ export MINVOTES=1
 ## Create an oracle of best possible output
 ${ENSEMBLE_CONDA}/bin/python3 \
     ${ENSEMBLE_DIR}/medspaCy/oracle-ensemble.py \
-    --types-dir ${ENSEMBLE_DIR}/types \
+    --types-dir /Users/pmh/git/ots-ensemble-systems/types \
     --input-dir "${MERGED_OUT}" \
     --classifier-list ${CLASSIFIERS} \
-    --voting-unit span \
+    --voting-unit doc \
     --output-dir ${SYS_DIR}
 
 ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
-    --reference-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
+    --reference-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
     --reference-input ${REF_DIR} \
-    --test-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
+    --test-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
     --test-input ${SYS_DIR} \
     --file-suffix ".xmi" \
-    --fuzzy-match-flags exact partial \
-    --metrics TP FP FN TN Recall Precision F1 \
-    > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log
+    --fuzzy-match-flags exact \
+    --metrics Accuracy TP FP FN TN \
+    --by-type \
+    > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log
 
-export EXACT_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log | cut -f 6- | head -n 1 | tr '\n' '\t'`
-export PARTIAL_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log | cut -f 6- | tail -n 1 | tr '\n' '\t'`
-    
-echo "${METHOD}	${CLASSIFIERS}	Exact	${EXACT_RECPRECF1}${MINVOTES}" \
-     >> ${RESULT_FILE}
-echo "${METHOD}	${CLASSIFIERS}	Partial	${PARTIAL_RECPRECF1}${MINVOTES}" \
-     >> ${RESULT_FILE}
+${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
+    --reference-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
+    --reference-input ${REF_DIR} \
+    --test-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
+    --test-input ${SYS_DIR} \
+    --file-suffix ".xmi" \
+    --fuzzy-match-flags exact \
+    --metrics Accuracy TP FP FN TN \
+    --by-type \
+    --score-key Parent \
+    >> ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log
+
+for i in `egrep -v "^(micro|macro|exact)" ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | tr '\t' '|'`;do
+    echo "${METHOD}	${CLASSIFIERS}	`echo $i | tr '|' '\t'`	${MINVOTES}" \
+	 >> ${RESULT_FILE};done
+
 
 export METHOD=voting
 for MINVOTES in {1..${MAXVOTES}}
@@ -112,27 +117,37 @@ do
         ${ENSEMBLE_DIR}/medspaCy/voting-ensemble.py \
         --types-dir ${ENSEMBLE_DIR}/types \
         --input-dir "${MERGED_OUT}" \
-        --voting-unit span \
+	--voting-unit doc \
         --classifier-list ${CLASSIFIERS} \
         --min-votes ${MINVOTES} \
         --zero-strategy drop \
         --output-dir ${SYS_DIR}
 
     ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
-      --reference-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
+      --reference-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
       --reference-input ${REF_DIR} \
-      --test-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
+      --test-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
       --test-input ${SYS_DIR} \
       --file-suffix ".xmi" \
-    --fuzzy-match-flags exact partial \
-    --metrics TP FP FN TN Recall Precision F1 \
-    > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log
+      --fuzzy-match-flags exact \
+      --metrics Accuracy TP FP FN TN \
+      --by-type \
+      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log
 
-    export EXACT_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log | cut -f 6- | head -n 1 | tr '\n' '\t'`
-    export PARTIAL_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log | cut -f 6- | tail -n 1 | tr '\n' '\t'`
-    
-    echo "${METHOD}	${CLASSIFIERS}	Exact	${EXACT_RECPRECF1}${MINVOTES}" \
-	 >> ${RESULT_FILE}
-    echo "${METHOD}	${CLASSIFIERS}	Partial	${PARTIAL_RECPRECF1}${MINVOTES}" \
-	 >> ${RESULT_FILE}
+    ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
+      --reference-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
+      --reference-input ${REF_DIR} \
+      --test-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
+      --test-input ${SYS_DIR} \
+      --file-suffix ".xmi" \
+      --fuzzy-match-flags exact \
+      --metrics Accuracy TP FP FN TN \
+      --by-type \
+      --score-key Parent \
+      >> ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log
+
+    for i in `egrep -v "^(micro|macro|exact)" ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | tr '\t' '|'`;do
+	echo "${METHOD}	${CLASSIFIERS}	`echo $i | tr '|' '\t'`	${MINVOTES}" \
+	>> ${RESULT_FILE};done
+
 done

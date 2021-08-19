@@ -2,8 +2,6 @@
 
 ## Most, if not all, of these environment variables will need to be
 ## customized to match your running environment.
-export SECTIONIZER_DIR=/Users/pmh/git/ots-clinical-sectionizer
-export SECTIONIZER_CONDA=~/opt/anaconda3/envs/sections-py3.8
 export ENSEMBLE_DIR=/Users/pmh/git/ots-ensemble-systems
 export ENSEMBLE_CONDA=~/opt/anaconda3/envs/ensemble-py3.8
 export ETUDE_DIR=/Users/pmh/git/etude
@@ -36,6 +34,8 @@ export N2C2_2019_DIR=/Users/pmh/data/n2c2/2019_n2c2_track-3
 
 export RESULT_DIR=${ENSEMBLE_DIR}/data/out
 export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
+
+mkdir -p "${RESULT_DIR}/${TASK}"
 
 echo "Method	Classifiers	Accuracy	Coverage	MinVote" \
      > ${RESULT_FILE}
@@ -85,7 +85,7 @@ ${ENSEMBLE_CONDA}/bin/python3 \
     --output-dir ${MERGED_OUT}
 
 
-## Create an oracle of best possible output
+## Create an reference corpus in the same format
 ${ENSEMBLE_CONDA}/bin/python3 \
     ${ENSEMBLE_DIR}/medspaCy/oracle-ensemble.py \
     --types-dir ${ENSEMBLE_DIR}/types \
