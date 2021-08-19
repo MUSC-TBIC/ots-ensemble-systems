@@ -207,15 +207,20 @@ def tallyDocVotes( cas ,
                           attrib_val == -1 ) ):
                         max_attribute_vals[ attribute ] = attrib_val
                         max_attribute_counts[ attribute ] = val_count
-        modifiers = [ 'confidence={}'.format( int( concept_count ) / len( classifiers ) ) ,
-                      'weighted_confidence={}'.format( int( concept_weight ) / len( classifiers ) ) ]
+        ## TODO - Current scoring can only support a single key/value
+        ## pair in the term_modifiers attribute
+        ##modifiers = [ 'confidence={}'.format( int( concept_count ) / len( classifiers ) ) ,
+        ##              'weighted_confidence={}'.format( int( concept_weight ) / len( classifiers ) ) ]
+        modifiers = []
         term_exists = True
         if( 'polarity' in attribute_list ):
-            modifiers.append( 'polarity={}'.format( int( max_attribute_vals[ 'polarity' ] ) ) )
+            ##modifiers.append( 'polarity={}'.format( int( max_attribute_vals[ 'polarity' ] ) ) )
             if( int( max_attribute_vals[ 'polarity' ] ) == -1 ):
                 term_exists = False
         if( 'uncertainty' in attribute_list ):
             modifiers.append( 'uncertainty={}'.format( int( max_attribute_vals[ 'uncertainty' ] ) ) )
+        else:
+            modifiers.append( 'uncertainty={}'.format( 0 ) )
         note_nlp = NoteNlp( begin = 0 ,
                             end = 0 ,
                             offset = 0 ,

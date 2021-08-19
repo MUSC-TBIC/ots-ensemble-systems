@@ -277,12 +277,16 @@ def main( args , classifiers ):
                 #### Add this reference annotation to the reference file
                 modifiers = []
                 term_exists = True
+                ## TODO - Current scoring can only support a single
+                ## key/value pair in the term_modifiers attribute
                 if( 'polarity' in attribute_list ):
-                    modifiers.append( 'polarity={}'.format( int( attribute_values[ 'polarity' ] ) ) )
+                    ##modifiers.append( 'polarity={}'.format( int( attribute_values[ 'polarity' ] ) ) )
                     if( int( attribute_values[ 'polarity' ] ) == -1 ):
                         term_exists = False
                 if( 'uncertainty' in attribute_list ):
                     modifiers.append( 'uncertainty={}'.format( int( attribute_values[ 'uncertainty' ] ) ) )
+                else:
+                    modifiers.append( 'uncertainty={}'.format( 0 ) )
                 note_nlp = NoteNlp( begin = 0 ,
                                     end = 0 ,
                                     offset = 0 ,

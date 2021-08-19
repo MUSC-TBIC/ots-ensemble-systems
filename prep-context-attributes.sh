@@ -29,7 +29,7 @@ export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
 
 mkdir -p "${RESULT_DIR}/${TASK}"
 
-echo "Method	Classifiers	Type	Accuracy	TP	FP	FN	TN	MinVote" \
+echo "Method	Classifiers	Type	TP	FP	FN	TN	MinVote" \
      > ${RESULT_FILE}
 
 ## RESULT_DIR/2008_i2b2_obesity
@@ -107,8 +107,8 @@ do
       --test-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
       --test-input ${SYS_DIR} \
       --file-suffix ".xmi" \
-      --fuzzy-match-flags exact \
-      --metrics Accuracy TP FP FN TN \
+      --fuzzy-match-flags doc-property \
+      --metrics TP FP FN TN \
       --by-type \
       > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log
 
@@ -118,13 +118,13 @@ do
       --test-conf ${CONFIG_DIR}/i2b2/i2b2-2008-obesity_doc-level_note-nlp.conf \
       --test-input ${SYS_DIR} \
       --file-suffix ".xmi" \
-      --fuzzy-match-flags exact \
-      --metrics Accuracy TP FP FN TN \
+      --fuzzy-match-flags doc-property \
+      --metrics TP FP FN TN \
       --by-type \
       --score-key Parent \
       >> ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log
 
-    for i in `egrep -v "^(micro|macro|exact)" ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | tr '\t' '|'`;do
+    for i in `egrep -v "^(micro|macro|exact|doc-property)" ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | tr '\t' '|'`;do
 	echo "${METHOD}	${CLASSIFIERS}	`echo $i | tr '|' '\t'`	${MINVOTES}" \
 	>> ${RESULT_FILE};done
 
