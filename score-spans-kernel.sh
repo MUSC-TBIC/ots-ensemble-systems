@@ -4,7 +4,7 @@ if [[ -z $CLASSIFIERS ]]; then
     echo "The variable \$CLASSIFIERS is not set"
     exit 0
 fi
-export SAFE_CLASSIFIERS=`echo $CLASSIFIERS | tr ' ' '-'`
+export SAFE_CLASSIFIERS=`echo $CLASSIFIERS | tr ' ' 'x'`
 
 if [[ -z $MAXVOTES ]]; then
     echo "The variable \$MAXVOTES is not set"
@@ -97,7 +97,7 @@ echo "${METHOD}	${CLASSIFIERS}	Partial	${PARTIAL_RECPRECF1}${MINVOTES}" \
      >> ${RESULT_FILE}
 
 export METHOD=voting
-for MINVOTES in {1..${MAXVOTES}}
+for MINVOTES in $(seq 1 ${MAXVOTES})
 do
 
     export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${SAFE_CLASSIFIERS}
