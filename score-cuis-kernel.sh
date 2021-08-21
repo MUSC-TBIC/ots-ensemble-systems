@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 
 if [[ -z $CLASSIFIERS ]]; then
     echo "The variable \$CLASSIFIERS is not set"
@@ -13,15 +13,15 @@ fi
 
 ## Most, if not all, of these environment variables will need to be
 ## customized to match your running environment.
-export ENSEMBLE_DIR=/Users/pmh/git/ots-ensemble-systems
-export ENSEMBLE_CONDA=~/opt/anaconda3/envs/ensemble-py3.8
-export ETUDE_DIR=/Users/pmh/git/etude
-export ETUDE_CONDA=~/opt/anaconda3/envs/etude-py3.7
-export CONFIG_DIR=/Users/pmh/git/etude-engine-configs
+export ENSEMBLE_DIR=/data/software/ots-ensemble-systems
+export ENSEMBLE_CONDA=/data/software/anaconda3/envs/ensemble-py3.8
+export ETUDE_DIR=/data/software/etude
+export ETUDE_CONDA=/data/software/anaconda3/envs/etude
+export CONFIG_DIR=/data/software/etude-engine-configs
 
 export TASK=2019_n2c2_track3
 
-export N2C2_2019_DIR=/Users/pmh/data/n2c2/2019_n2c2_track-3
+export N2C2_2019_DIR=/data/n2c2_corpora/2019_n2c2_track-3
 
 ## N2C2_2019_DIR
 ## |-- train
@@ -43,11 +43,12 @@ export N2C2_2019_DIR=/Users/pmh/data/n2c2/2019_n2c2_track-3
 ##     |-- submission_UWM.txt
 ##     `-- submission_ezDI.txt
 
-export RESULT_DIR=${ENSEMBLE_DIR}/data/out
+export RESULT_DIR=/data/experiments/ots-ensemble-paper
 export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
 
 ## RESULT_DIR/2019_n2c2_track3
 ## |-- 2019_n2c2_track3_results.csv
+## |-- rankedClassifiersTop.csv
 ## |-- etude
 ## |   |-- voting_1_1.log
 ## |   |-- voting_1_2.log
@@ -118,6 +119,8 @@ do
         --voting-unit span \
         --classifier-list ${CLASSIFIERS} \
         --min-votes ${MINVOTES} \
+        --overlap-strategy rank \
+        --rank-file ${RESULT_DIR}/${TASK_DIR}/rankedClassifiersTop.csv \
         --zero-strategy drop \
         --output-dir ${SYS_DIR}
 

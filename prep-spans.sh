@@ -1,16 +1,16 @@
-#!/bin/zsh
+#!/bin/bash
 
 ## Most, if not all, of these environment variables will need to be
 ## customized to match your running environment.
-export ENSEMBLE_DIR=/Users/pmh/git/ots-ensemble-systems
-export ENSEMBLE_CONDA=~/opt/anaconda3/envs/ensemble-py3.8
-export ETUDE_DIR=/Users/pmh/git/etude
-export ETUDE_CONDA=~/opt/anaconda3/envs/etude-py3.7
-export CONFIG_DIR=/Users/pmh/git/etude-engine-configs
+export ENSEMBLE_DIR=/data/software/ots-ensemble-systems
+export ENSEMBLE_CONDA=/data/software/anaconda3/envs/ensemble-py3.8
+export ETUDE_DIR=/data/software/etude
+export ETUDE_CONDA=/data/software/anaconda3/envs/etude
+export CONFIG_DIR=/data/software/etude-engine-configs
 
 export TASK=2009_i2b2_medications
 
-export I2B2_2009_DIR=/Users/pmh/data/i2b2_corpora/2009_i2b2_challenge_medications
+export I2B2_2009_DIR=/data/i2b2_corpora/2009_i2b2_challenge_medications
 
 ## I2B2_2008_DIR
 ## |-- obesity_annotations_test.xml
@@ -24,7 +24,7 @@ export I2B2_2009_DIR=/Users/pmh/data/i2b2_corpora/2009_i2b2_challenge_medication
 ##     |-- prod_190_0_1_nlpQF1X7H
 ##     `-- prod_204_0_3_nlpB1l4ZH
 
-export RESULT_DIR=${ENSEMBLE_DIR}/data/out
+export RESULT_DIR=/data/experiments/ots-ensemble-paper
 export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
 
 mkdir -p "${RESULT_DIR}/${TASK}"
