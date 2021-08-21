@@ -399,7 +399,7 @@ def main( args , classifiers ):
                                     end = 0 ,
                                     offset = 0 ,
                                     nlp_system = 'Oracle Ensemble System' ,
-                                    note_nlp_source_concept_id = cui ,
+                                    note_nlp_source_concept_id = concept ,
                                     term_exists = term_exists ,
                                     term_modifiers = ';'.join( modifiers ) )
                 cas.add_annotation( note_nlp )
