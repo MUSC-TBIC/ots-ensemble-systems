@@ -216,11 +216,20 @@ def main( args , classifiers ):
                     classifiers is None or
                     technique not in classifiers ):
                     continue
+                try:
+                    concept_id = int( annot.ontologyConceptArray )
+                    cui = xmiId2cui[ concept_id ]
+                except TypeError as e:
+                    ## A TypeError here means occurs when
+                    ## ontologyConceptArray is not defined, meaning
+                    ## that there is no associated CUI
+                    cui = 'span'
                 begin_offset = annot.begin
                 end_offset = annot.end
                 span = '{}-{}'.format( begin_offset , end_offset )
                 ## TODO - we only support exact match oracle merging
-                if( span in oracle_kb ):
+                if( span in oracle_kb and
+                    cui in oracle_kb[ span ][ 'norm_counts' ] ):
                     weight = 1
                     if( span not in kb ):
                         kb[ span ] = {}
@@ -330,29 +339,35 @@ def main( args , classifiers ):
                 ####
                 weight = 1
                 ########
+                if( concept not in oracle_kb ):
+                    continue
+                ####
                 if( concept not in kb ):
                     kb[ concept ] = {}
                     kb[ concept ][ 'begin_offset' ] = 0
                     kb[ concept ][ 'end_offset' ] = 0
                     kb[ concept ][ 'norm_counts' ] = 0
                     kb[ concept ][ 'norm_weights' ] = 0
-                kb[ concept ][ 'norm_counts' ] += 1
-                kb[ concept ][ 'norm_weights' ] += weight
+                ####
                 for attribute in attribute_list:
-                    if( attribute not in kb[ concept ] ):
-                        kb[ concept ][ attribute ] = {}
-                        kb[ concept ][ attribute ][ 'norm_counts' ] = {}
-                        kb[ concept ][ attribute ][ 'norm_weights' ] = {}
+                    if( attribute not in oracle_kb[ concept ] ):
+                        continue
                     if( attribute in attribute_values ):
                         attrib_val = attribute_values[ attribute ]
                     else:
                         attrib_val = 0
-                    if( attrib_val in oracle_kb[ concept ][ attribute ][ 'norm_counts' ] ):
-                        if( attrib_val not in kb[ concept ][ attribute ][ 'norm_counts' ] ):
-                            kb[ concept ][ attribute ][ 'norm_counts' ][ attrib_val ] = 0
-                            kb[ concept ][ attribute ][ 'norm_weights' ][ attrib_val ] = 0
-                        kb[ concept ][ attribute ][ 'norm_counts' ][ attrib_val ] += 1
-                        kb[ concept ][ attribute ][ 'norm_weights' ][ attrib_val ] += weight
+                    if( attrib_val not in oracle_kb[ concept ][ attribute ][ 'norm_counts' ] ):
+                        continue
+                    ####
+                    if( attribute not in kb[ concept ] ):
+                        kb[ concept ][ attribute ] = {}
+                        kb[ concept ][ attribute ][ 'norm_counts' ] = {}
+                        kb[ concept ][ attribute ][ 'norm_weights' ] = {}
+                    if( attrib_val not in kb[ concept ][ attribute ][ 'norm_counts' ] ):
+                        kb[ concept ][ attribute ][ 'norm_counts' ][ attrib_val ] = 0
+                        kb[ concept ][ attribute ][ 'norm_weights' ][ attrib_val ] = 0
+                    kb[ concept ][ attribute ][ 'norm_counts' ][ attrib_val ] += 1
+                    kb[ concept ][ attribute ][ 'norm_weights' ][ attrib_val ] += weight
         ################
         if( args.votingUnit == 'sentence' or
             args.votingUnit == 'span' ):
@@ -382,19 +397,28 @@ def main( args , classifiers ):
             for concept in kb:
                 concept_count = kb[ concept ][ 'norm_counts' ]
                 concept_weight = kb[ concept ][ 'norm_weights' ]
-                modifiers = [ 'confidence={}'.format( int( concept_count ) / len( classifiers ) ) ,
-                              'weighted_confidence={}'.format( int( concept_weight ) / len( classifiers ) ) ]
+                ## TODO - Current scoring can only support a single key/value
+                ## pair in the term_modifiers attribute
+                ##modifiers = [ 'confidence={}'.format( int( concept_count ) / len( classifiers ) ) ,
+                ##              'weighted_confidence={}'.format( int( concept_weight ) / len( classifiers ) ) ]
+                modifiers = []
                 term_exists = True
                 if( 'polarity' in kb[ concept ] ):
-                    for attrib_val in kb[ concept ][ 'polarity' ][ 'norm_counts' ]:
-                        ## TODO - add error check. this loop should run exactly and only once
-                        modifiers.append( 'polarity={}'.format( int( attrib_val ) ) )
-                    if( int( attrib_val ) == -1 ):
-                        term_exists = False
+                    ## If we failed to have a valid reference point, leave the default
+                    if( 'polarity' in kb[ concept ] ):
+                        for attrib_val in kb[ concept ][ 'polarity' ][ 'norm_counts' ]:
+                            ## TODO - add error check. this loop should run exactly and only once
+                            ##modifiers.append( 'polarity={}'.format( int( attrib_val ) ) )
+                            if( int( attrib_val ) == -1 ):
+                                term_exists = False
                 if( 'uncertainty' in attribute_list ):
-                    for attrib_val in kb[ concept ][ 'uncertainty' ][ 'norm_counts' ]:
-                        ## TODO - add error check. this loop should run exactly and only once
-                        modifiers.append( 'uncertainty={}'.format( int( attrib_val ) ) )
+                    ## If we failed to have a valid reference point, choose the default
+                    if( 'uncertainty' not in kb[ concept ] ):
+                        modifiers.append( 'uncertainty={}'.format( 0 ) )
+                    else:
+                        for attrib_val in kb[ concept ][ 'uncertainty' ][ 'norm_counts' ]:
+                            ## TODO - add error check. this loop should run exactly and only once
+                            modifiers.append( 'uncertainty={}'.format( int( attrib_val ) ) )
                 note_nlp = NoteNlp( begin = 0 ,
                                     end = 0 ,
                                     offset = 0 ,
