@@ -112,7 +112,7 @@ do
         --classifier-list ${CLASSIFIERS} \
         --min-votes ${MINVOTES} \
         --overlap-strategy rank \
-        --rank-file ${RESULT_DIR}/${TASK_DIR}/rankedClassifiersTop.csv \
+        --rank-file ${RESULT_DIR}/${TASK}/rankedClassifiersTop.csv \
         --zero-strategy drop \
         --output-dir ${SYS_DIR}
     
