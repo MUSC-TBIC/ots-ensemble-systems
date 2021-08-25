@@ -205,13 +205,15 @@ def main( args ):
         ####
         for team in sorted( teams ):
             team_id += 1
-            if( os.path.exists( os.path.join( args.inputSharpnDir , team , xmi_filename ) ) ):
+            if( args.inputSharpnDir is not None and
+                os.path.exists( os.path.join( args.inputSharpnDir , team , xmi_filename ) ) ):
                 cas = process_cas_xmi_file( cas ,
                                             IdentifiedAnnotation ,
                                             os.path.join( args.inputSharpnDir , team , xmi_filename ) ,
                                             team_id )
                 
-            elif( os.path.exists( os.path.join( args.inputBionlpDir , team , xml_filename ) ) ):
+            elif( args.inputBionlpDir is not None and
+                  os.path.exists( os.path.join( args.inputBionlpDir , team , xml_filename ) ) ):
                 cas = process_bionlp_file( cas ,
                                            IdentifiedAnnotation ,
                                            os.path.join( args.inputBionlpDir , team , xml_filename ) ,
