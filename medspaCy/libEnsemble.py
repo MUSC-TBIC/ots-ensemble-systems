@@ -11,8 +11,113 @@ import spacy
 import medspacy
 import cassis
 
-from libTypeSystem import loadTypeSystem
-from libEnsemble import tallySpannedVotes, tallyDocVotes
+
+def tallySpannedVotes( cas ,
+                       NoteNlp ,
+                       kb ,
+                       classifiers ,
+                       votingUnit ,
+                       minVotes ,
+                       zeroStrategy ):
+    for span in kb:
+        max_cui = 'CUI-less'
+        max_cui_count = 0
+        ## TODO - allow option to choose CUI based on weighted score
+        if( votingUnit == 'sentence' ):
+            max_norm_weights = kb[ span ][ 'norm_weights' ][ 'section' ]
+        for cui in kb[ span ][ 'norm_counts' ]:
+            cui_count = kb[ span ][ 'norm_counts' ][ cui ]
+            if( cui_count > max_cui_count and
+                cui_count >= minVotes ):
+                max_cui = cui
+                max_cui_count = cui_count
+                if( votingUnit == 'span' ):
+                    max_norm_weights = kb[ span ][ 'norm_weights' ][ cui ]
+        if( zeroStrategy == 'drop' and
+            ( ( votingUnit == 'span' and max_cui_count == 0 ) or
+              ( votingUnit == 'sentence' and max_norm_weights < minVotes ) ) ):
+            continue
+        ## TODO - add special flag to set whether we want to track CUIs or not
+        modifiers = [ 'confidence={}'.format( max_cui_count / len( classifiers ) ) ,
+                      'weighted_confidence={}'.format( max_norm_weights / len( classifiers ) ) ]
+        if( votingUnit == 'sentence' ):
+            note_nlp = NoteNlp( begin = kb[ span ][ 'begin_offset' ] ,
+                                end = kb[ span ][ 'end_offset' ] ,
+                                offset = kb[ span ][ 'begin_offset' ] ,
+                                nlp_system = 'Majority Voting Ensemble System' ,
+                                term_modifiers = ';'.join( modifiers ) )
+        elif( votingUnit == 'span' ):
+            note_nlp = NoteNlp( begin = kb[ span ][ 'begin_offset' ] ,
+                                end = kb[ span ][ 'end_offset' ] ,
+                                offset = kb[ span ][ 'begin_offset' ] ,
+                                nlp_system = 'Majority Voting Ensemble System' ,
+                                note_nlp_source_concept_id = max_cui ,
+                                term_modifiers = ';'.join( modifiers ) )
+        cas.add_annotation( note_nlp )
+    return( cas )
+
+
+def tallyDocVotes( cas ,
+                   NoteNlp ,
+                   kb ,
+                   classifiers ,
+                   attribute_list ,
+                   minVotes ,
+                   zeroStrategy ):
+    for concept in kb:
+        ## If a concept doesn't meet the minimum vote threshold, then
+        ## we treate the concept as "not mentioned" (and don't include
+        ## the annotation at all)
+        concept_count = kb[ concept ][ 'norm_counts' ]
+        concept_weight = kb[ concept ][ 'norm_weights' ]
+        ## TODO - should "unmentioned" entries also be tallied here as
+        ##        a counter-proposal to present?
+        if( concept_count < minVotes ):
+            continue
+        ##
+        max_attribute_vals = {}
+        max_attribute_counts = {}
+        for attribute in attribute_list:
+            for attrib_val in kb[ concept ][ attribute ][ 'norm_counts' ]:
+                val_count = kb[ concept ][ attribute ][ 'norm_counts' ][ attrib_val ]
+                if( attribute not in max_attribute_counts ):
+                    max_attribute_vals[ attribute ] = attrib_val
+                    max_attribute_counts[ attribute ] = val_count
+                elif( val_count > max_attribute_counts[ attribute ] ):
+                    max_attribute_vals[ attribute ] = attrib_val
+                    max_attribute_counts[ attribute ] = val_count
+                elif( val_count == max_attribute_counts[ attribute ] ):
+                    ## For ties, we want to treat the most extreme or noticable value
+                    ## as the preferred value.  -1 > 1 > 0
+                    if( ( int( max_attribute_vals[ attribute ] ) == 0 ) or
+                        ( int( max_attribute_vals[ attribute ] ) == 1 and
+                          attrib_val == -1 ) ):
+                        max_attribute_vals[ attribute ] = attrib_val
+                        max_attribute_counts[ attribute ] = val_count
+        ## TODO - Current scoring can only support a single key/value
+        ## pair in the term_modifiers attribute
+        ##modifiers = [ 'confidence={}'.format( int( concept_count ) / len( classifiers ) ) ,
+        ##              'weighted_confidence={}'.format( int( concept_weight ) / len( classifiers ) ) ]
+        modifiers = []
+        term_exists = True
+        if( 'polarity' in attribute_list ):
+            ##modifiers.append( 'polarity={}'.format( int( max_attribute_vals[ 'polarity' ] ) ) )
+            if( int( max_attribute_vals[ 'polarity' ] ) == -1 ):
+                term_exists = False
+        if( 'uncertainty' in attribute_list ):
+            modifiers.append( 'uncertainty={}'.format( int( max_attribute_vals[ 'uncertainty' ] ) ) )
+        else:
+            modifiers.append( 'uncertainty={}'.format( 0 ) )
+        note_nlp = NoteNlp( begin = 0 ,
+                            end = 0 ,
+                            offset = 0 ,
+                            nlp_system = 'Majority Voting Ensemble System' ,
+                            ## TODO - map this correctly to a CUI
+                            note_nlp_source_concept_id = concept ,
+                            term_exists = term_exists ,
+                            term_modifiers = ';'.join( modifiers ) )
+        cas.add_annotation( note_nlp )
+    return( cas )
 
 
 def main( args , classifiers ):
@@ -317,89 +422,3 @@ def main( args , classifiers ):
             cas.to_xmi( path = os.path.join( args.outputDir , xmi_filename ) ,
                         pretty_print = True )
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser( description = 'Simple voting ensemble system' )
-    parser.add_argument( '-v' , '--verbose' ,
-                         help = "Log at the DEBUG level" ,
-                         action = "store_true" )
-    parser.add_argument( '--types-dir' ,
-                         dest = 'typesDir' ,
-                         help = 'Directory containing the systems files need to be loaded' )
-    parser.add_argument( '--input-dir' ,
-                         required = True ,
-                         dest = 'inputDir' ,
-                         help = 'Input directory containing CAS XMI files' )
-    parser.add_argument( '--file-list' , default = None ,
-                         dest = 'fileList' ,
-                         help = 'File containing the basename of all files in order' )
-    parser.add_argument( '--ref-dir' ,
-                         default = None ,
-                         dest = 'refDir' ,
-                         help = 'Output directory for writing the reference CAS XMI files to' )
-    parser.add_argument( '--classifier-list' , nargs = '+' ,
-                         default = None ,
-                         dest = 'classifierList' ,
-                         help = 'List of classifiers (space separated and by numerical id) to include' )
-    parser.add_argument( '--classifier-rank-file' , default = None ,
-                         dest = 'rankFile' ,
-                         help = 'File containing the classifiers ranked in the best to worst performance order (used to break ties)' )
-    parser.add_argument( '--min-votes' ,
-                         default = 1 ,
-                         dest = 'minVotes' ,
-                         help = 'Minimum numbers of votes required to win a (majority) vote' )
-    parser.add_argument( '--zero-strategy' ,
-                         default = 'CUI-less' ,
-                         choices = [ 'drop' , 'CUI-less' ] ,
-                         dest = 'zeroStrategy' ,
-                         help = 'When no normalizations receives enough votes, use this strategy to select a normalization' )
-    parser.add_argument( '--overlap-strategy' ,
-                         default = 'rank' ,
-                         ## TODO - support additional strategies
-                         ##choices = [ 'rank' , 'flatten' , 'longest', 'shortest' ] ,
-                         choices = [ 'rank' ] ,
-                         dest = 'overlapStrategy' ,
-                         help = 'Strategy for resolving conflicts of span overlap between annotations when using the span as the voting unit' )
-    parser.add_argument( '--voting-unit' ,
-                         default = 'span' ,
-                         choices = [ 'span' , 'sentence' , 'doc' ] ,
-                         dest = 'votingUnit' ,
-                         help = 'The unit that accumulates votes: "span" means to treat annotations as their own unit, "sentence" means to converge on all spans matching a sentence, "doc" aggregates all annotations at the document level' )
-    parser.add_argument( '--tie-breaker' ,
-                         default = 'random' ,
-                         choices = [ 'random' , 'ranked' , 'confidenceScore' ] ,
-                         dest = 'tieBreaker' ,
-                         help = 'When multiple normalizations receive the same number of votes, use this strategy to resolve ties' )
-    parser.add_argument( '--rank-file' ,
-                         default = None ,
-                         dest = 'rankFile' ,
-                         help = 'File containing the ranked list of classifiers to be used in tie-breakers (earlier classifiers are chosen over later classifiers' )
-    parser.add_argument( '--output-dir' ,
-                         default = None ,
-                         dest = 'outputDir' ,
-                         help = 'Output directory for writing the oracle consolidated CAS XMI files to' )
-    args = parser.parse_args()
-    ## Set up logging
-    if args.verbose:
-        log.basicConfig( format = "%(levelname)s: %(message)s" ,
-                         level = log.DEBUG )
-        log.info( "Verbose output." )
-        log.debug( "{}".format( args ) )
-    else:
-        log.basicConfig( format="%(levelname)s: %(message)s" )
-    ##
-    args.minVotes = int( args.minVotes )
-    ## In order to support quoted and unquoted classifier lists, we'll
-    ## check if there is a single argument and it contains a space. If
-    ## so, we can assume it is safe to explode the first arg and
-    ## create a list from that:
-    ##
-    ## --classifier-list 1 2 3
-    ##     vs.
-    ## --classifier-list "1 2 3"
-    if( args.classifierList is not None and
-        len( args.classifierList ) == 1 and
-        ' ' in args.classifierList[ 0 ] ):
-        args.classifierList = args.classifierList[ 0 ].split()
-    ####
-    main( args , args.classifierList )
