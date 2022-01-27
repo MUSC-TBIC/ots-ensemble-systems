@@ -18,6 +18,7 @@ data/
 
 bin/
 target/
+*.class
 *.jar
 
 # #############

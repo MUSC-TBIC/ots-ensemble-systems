@@ -33,8 +33,15 @@ public class DTM {
         // if true: weighted version
         boolean ifWeight = true;
         
-        DecimalFormat fm = new DecimalFormat("00.00");        
-        String cMapFile = "data/i2b2/i2b2_2014_type.txt";
+        DecimalFormat fm = new DecimalFormat("00.00");
+        // Sample contents:  i2b2_2014_type.txt
+        // DOCTOR,NAME
+        // PATIENT,NAME
+        // USERNAME,NAME
+        // PROFESSION,PROFESSION
+        // CITY,LOCATION
+        // ...
+        String cMapFile = "types/i2b2_2014_type.txt";
         String daA[] = {"04", "06", "14", "16"};
         
         double thA[];
@@ -51,14 +58,15 @@ public class DTM {
                           {"06", "14", "16", "04"},          
                           {"14", "16", "06", "04"},            
                           {"16", "14", "06", "04"}
-                        };
+        };
         
         HashMap<String, String> sm = new HashMap<String, String>();
         readMapFile(cMapFile, sm);
 
         for (int v = 0; v < daA.length; v++) {
-            
+            //"04", "06", "14", "16"
             String da = daA[v];
+            //e.g., 0.7, 0.5, 0.6, 0.7 threshold value
             double th = thA[v];
             
             // for each ref type,  // classfier
@@ -67,6 +75,7 @@ public class DTM {
                 String dm = dmA[w];
                         
                 args = new String[100];
+                //FILE NAME
                 String dir = "data/i2b2/20" + da + "deid/" + dm + "/";
 
                 args[0] = dir + "xml/";
@@ -79,6 +88,7 @@ public class DTM {
                 }
 
                 int j = 3;                    
+                //FILE SUFFIX
                 String ms[] = msA[v];
                 for (String m : ms) {
                     if (m.equalsIgnoreCase(da)) {
@@ -113,7 +123,7 @@ public class DTM {
             }  // train or test     
         } // data set
     }
-    
+    //PARSE THE OUT FILE
     public static void parse(String out, HashMap<String, Double> sc, DecimalFormat fm, int option) {
 
         String str = "";
@@ -162,7 +172,7 @@ public class DTM {
                     txtin.close();
                 } catch (Exception ex) {
 
-               }
+                }
             }
         }
     }
@@ -175,13 +185,13 @@ public class DTM {
         
         try {
             Process p = Runtime.getRuntime().exec("python data/i2b2/2014deid/2016_CEGS_N-GRID_evaluation_scripts-master/evaluate.py track1 "
-                     + refDir + " " + ansDir);
+                                                  + refDir + " " + ansDir);
 
             BufferedReader stdInput = new BufferedReader(new 
-                 InputStreamReader(p.getInputStream()));
+                                                         InputStreamReader(p.getInputStream()));
 
             BufferedReader stdError = new BufferedReader(new 
-                 InputStreamReader(p.getErrorStream()));
+                                                         InputStreamReader(p.getErrorStream()));
 
             // read the output from the command
             //System.out.println("Here is the standard output of the command:\n");
@@ -206,7 +216,7 @@ public class DTM {
         
         return sb.toString();
     }
-
+    //READS IN THE FILE AND STORE THEM TO sm AS [sub, tag]
     public static void readMapFile(String file, HashMap<String, String> sm) {
 
         String str = "";
@@ -230,15 +240,16 @@ public class DTM {
                     txtin.close();
                 } catch (Exception ex) {
 
-               }
+                }
             }
         }
     }        
         
-    
+    //EXECUTE TRAIN AND TEST
+    //args FOR REFERENCE DIR AND TEXT DIR
     public static void exec(String[] args, boolean ifTrain, String year,
-            HashMap<String, HashMap<String, Double>> dps,
-            HashMap<String, String> sm, double th, boolean ifWeight) {
+                            HashMap<String, HashMap<String, Double>> dps,
+                            HashMap<String, String> sm, double th, boolean ifWeight) {
 
         // add input systems
         ArrayList<String> inDirs = new ArrayList<String>();
@@ -285,10 +296,11 @@ public class DTM {
         }
 
     }        
-    
+    //TRAINING
+    //instList is a list of sets of "fileName + " " + start + " " + end + " " + type1" from inDirs
     public static void train(ArrayList<HashSet<String>> instList, HashSet<String> refs, 
-            HashMap<String, HashMap<String, Double>> dps,
-            HashMap<String, String> sm, boolean ifWeight) {
+                             HashMap<String, HashMap<String, Double>> dps,
+                             HashMap<String, String> sm, boolean ifWeight) {
         
         // collect span info of reference concepts
         HashSet<String> rSpan = new HashSet<>();
@@ -299,7 +311,7 @@ public class DTM {
             int rE = Integer.parseInt(r[2]);
             rSpan.add(rf + " " + rB + " " + rE);
         }        
-        
+        //cnts FOR COUNTING TYPES
         HashMap<String, Double> cnts = new HashMap<>();
         
         // collect system outputs for false concepts
@@ -335,7 +347,7 @@ public class DTM {
             int rB = Integer.parseInt(r[1]);
             int rE = Integer.parseInt(r[2]);
             String rS = r[3];
-
+            //cnts counts the occurence of different type1s
             // check count for only positive except negatives
             if (!rS.equalsIgnoreCase("NONE")) {
                 if (!cnts.containsKey(rS)) {
@@ -348,6 +360,7 @@ public class DTM {
             
             // compare to get match span exact
             // exact sub, exact type
+            //ADD TO dp
             HashSet<String> dp = new HashSet<>();
             for (int i = 0; i < instList.size(); i++) {
                 HashSet<String> anss = instList.get(i);
@@ -359,7 +372,9 @@ public class DTM {
                     }
                     int aB = Integer.parseInt(a[1]);
                     int aE = Integer.parseInt(a[2]);
+                    //aS-type
                     String aS = a[3];                    
+                    //aT-super type
                     String aT = sm.get(aS);
                             
                     if (rB == aB && rE == aE) {
@@ -368,10 +383,10 @@ public class DTM {
                         //System.out.println(i + " " + aS);            
                     }
                     /*
-                    if (!(rE <= aB || aE <= rB)) { // partial
-                        dp.add(i + " ps " + aS);
-                        dp.add(i + " pt " + aT);                                               
-                    }
+                      if (!(rE <= aB || aE <= rB)) { // partial
+                      dp.add(i + " ps " + aS);
+                      dp.add(i + " pt " + aT);                                               
+                      }
                     */
                 }                
             }
@@ -406,6 +421,7 @@ public class DTM {
         }
                 
         for (String t : dps.keySet()) {
+            //c-global frequency
             double c = cnts.get(t);
             HashMap<String, Double> v = dps.get(t);
             for (String d : v.keySet()) {
@@ -415,19 +431,19 @@ public class DTM {
         }
         
         /*
-        for (String t : dps.keySet()) {
-            System.out.println(t);
-            HashMap<String, Double> v = dps.get(t);
-            for (String d : v.keySet()) {
-                System.out.println("\t" + d + "\t" + v.get(d));
-            }                        
-        }
+          for (String t : dps.keySet()) {
+          System.out.println(t);
+          HashMap<String, Double> v = dps.get(t);
+          for (String d : v.keySet()) {
+          System.out.println("\t" + d + "\t" + v.get(d));
+          }                        
+          }
         */
     }
     
     public static void test(ArrayList<HashSet<String>> instList, HashMap<String, HashMap<String, Double>> dps,
-            HashMap<String, String> sm, String txtDir,
-            String outDir, String year, double th) {
+                            HashMap<String, String> sm, String txtDir,
+                            String outDir, String year, double th) {
 
         // collect system outputs
         HashMap<String, Integer> orders = new HashMap<>();
@@ -450,15 +466,19 @@ public class DTM {
         for (String ref : orders.keySet()) {            
             String r[] = ref.split(" ");
             //fileName + " " + start + " " + end + " " + type1; // fileName added
+            //rf-fileName
             String rf = r[0];
+            //rB-start
             int rB = Integer.parseInt(r[1]);
+            //rE-end
             int rE = Integer.parseInt(r[2]);
 
             if (done.contains(rf + " " + rB + " " + rE)) {
                 continue;
             }    
+            //order - index
             int order = orders.get(ref);
-
+            //rS-type1
             String rS = r[3];
             
             HashSet<String> dp = new HashSet<>();
@@ -481,10 +501,10 @@ public class DTM {
                         //System.out.println(i + " " + aS);         
                     }
                     /*
-                    if (!(rE <= aB || aE <= rB)) { // partial
-                        dp.add(i + " ps " + aS);
-                        dp.add(i + " pt " + aT);                                               
-                    }
+                      if (!(rE <= aB || aE <= rB)) { // partial
+                      dp.add(i + " ps " + aS);
+                      dp.add(i + " pt " + aT);                                               
+                      }
                     */
                 }                
             }
@@ -572,20 +592,20 @@ public class DTM {
     }
         
     /* check overlap
-     if no overlap, add
-     if overlap,
-     *  if highest vote count, add
-     * 
-     *  if same votes exist,
-     *      if highest priority, add
-    */
+       if no overlap, add
+       if overlap,
+       *  if highest vote count, add
+       * 
+       *  if same votes exist,
+       *      if highest priority, add
+       */
     
-   public static void overlap(
-            TreeMap<String, String> maps,
-            TreeMap<String, Integer> orders,
-            TreeMap<String, Double> scores,
-            ArrayList<String> inst
-            ) { 
+    public static void overlap(
+                               TreeMap<String, String> maps,
+                               TreeMap<String, Integer> orders,
+                               TreeMap<String, Double> scores,
+                               ArrayList<String> inst
+                               ) { 
         
         TreeMap<String, String> tmp = new TreeMap<String, String>();
         tmp.putAll(maps);
@@ -673,7 +693,7 @@ public class DTM {
                         }
                         
                     } else {
-                    // if there are concepts with same vote    
+                        // if there are concepts with same vote    
                         int order = orders.get(key);
                         
                         // by order
@@ -745,7 +765,7 @@ public class DTM {
                     txtin.close();
                 } catch (Exception ex) {
 
-               }
+                }
             }
         }
         
@@ -800,15 +820,15 @@ public class DTM {
                     txtin.close();
                 } catch (Exception ex) {
 
-               }
+                }
             }
         }
     }    
     
     public static PrintWriter getPrintWriter (String file)
-    throws IOException {
+        throws IOException {
         return new PrintWriter (new BufferedWriter
-                (new FileWriter(file)));
+                                (new FileWriter(file)));
     }
 
     public static void writeListFile(String name, ArrayList<String> outs, String txtDir, String outDir, String year) {
