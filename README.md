@@ -14,6 +14,24 @@ pip install -r requirements.txt
 
 ```
 
+## Data Set-Up ##
+
+In the root directory of this repository are a series of shell scripts
+named `prep-X.sh.TEMPLATE`. Copy these template files to the
+equivalent file ending in `.sh`. At the start of each `.sh` script
+file is a set of environment variables that need to localized to your
+machine's paths. For instance, in `prep-spans.sh`, `ENSEMBLE_DIR`
+should be pointed at the root of this repository and `I2B2_2009_DIR`
+should point your local copy of the 2009 i2b2 Medications Challenge
+dataset. The rough outline of expected folders and files is also
+provided in the shell script.
+
+*NB:* We use the `*.TEMPLATE` suffix for the base scripts so that any
+changes we make to these scripts upstream in the repository won't
+automatically wipe out any local customizations you may have
+made. This does mean that you may need to manually update (or use a
+diff/merge tool) your scripts from time to time.
+
 ## SHARP-n Style Annotation Schema ##
 
 Right LE pain
@@ -82,7 +100,7 @@ system<sub>1</sub> dir ~ system<sub>n</sub> dir: the directories containing the 
 	
 # decision template method
 
-`DTM.java`
+`javac -cp /path/to/jsoup/jsoup-1.14.3.jar DTM.java`
 
 	for weighted DTM, set the 'ifWeight' parameter to true
 	

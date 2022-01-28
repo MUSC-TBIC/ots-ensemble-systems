@@ -14,8 +14,7 @@ import cassis
 import pickle
 
 from libTypeSystem import loadTypeSystem
-from libEnsemble import tallySpannedVotes, tallyDocVotes
-
+from libEnsemble import cosineSpannedVotes
 
 def main( args , classifiers ):
     ############################
@@ -61,7 +60,7 @@ def main( args , classifiers ):
         census , decision_profiles = pickle.load( open( args.decisionProfilesPkl , 'rb' ) )
     ## Iterate over the files, covert to CAS, and write the XMI to disk
     for filename in tqdm( filenames ,
-                          desc = 'Voting (k={})'.format( len( classifiers ) ) ):
+                          desc = 'Collecting Profiles (k={})'.format( len( classifiers ) ) ):
         ##
         classifier2id = {}
         id2classifier = {}
@@ -137,7 +136,7 @@ def main( args , classifiers ):
                 continue
             for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
                 technique = annot.discoveryTechnique
-                if( ( trainPhase and technique != 0 ) or
+                if( ( trainPhase and technique != '0' ) or
                     ( not trainPhase and technique != top_classifier_id ) ):
                     continue
                 begin_offset = annot.begin
@@ -158,7 +157,7 @@ def main( args , classifiers ):
                     ## that there is no associated CUI
                     cui = 'span'
                 if( not trainPhase and args.weighting == 'ranked' ):
-                    weight = 1 / technique
+                    weight = 1 / int( technique )
                 else:
                     weight = 1
                 kb[ span ][ 'norm_counts' ][ cui ] = 1
@@ -219,7 +218,7 @@ def main( args , classifiers ):
             end_offset = annot.end
             span = '{}-{}'.format( begin_offset , end_offset )
             if( args.weighting == 'ranked' ):
-                weight = 1 / technique
+                weight = 1 / int( technique )
             else:
                 weight = 1
             ######################################################
@@ -396,6 +395,7 @@ def main( args , classifiers ):
                         kb[ span ][ 'norm_weights' ] = {}
                         kb[ span ][ 'norm_counts' ][ cui ] = 1
                         kb[ span ][ 'norm_weights' ][ cui ] = weight
+                        kb[ span ][ 'decision_profile' ] = {}
                         kb[ span ][ 'decision_profile' ][ technique ] = {}
                         kb[ span ][ 'decision_profile' ][ technique ][ cui ] = weight
         #########
@@ -407,10 +407,10 @@ def main( args , classifiers ):
                 args.votingUnit == 'span' ):
                 cas = cosineSpannedVotes( cas ,
                                           NoteNlp ,
-                                          args.decisionProfilesPkl ,
+                                          kb ,
+                                          decision_profiles ,
                                           classifiers ,
                                           args.votingUnit ,
-                                          args.minVotes ,
                                           args.zeroStrategy )
             elif( args.votingUnit == 'doc' ):
                 cas = tallyDocVotes( cas ,
@@ -420,17 +420,17 @@ def main( args , classifiers ):
                                      attribute_list ,
                                      args.minVotes ,
                                      args.zeroStrategy )
-        ################
-        if( not trainPhase and args.outputDir is not None ):
-            cas.to_xmi( path = os.path.join( args.outputDir , xmi_filename ) ,
-                        pretty_print = True )
+            ################
+            if( args.outputDir is not None ):
+                cas.to_xmi( path = os.path.join( args.outputDir , xmi_filename ) ,
+                            pretty_print = True )
     ####
     if( trainPhase ):
         ## Normalize the weights for a decision profile against
         ## the global frequency of a given annotation type
-        for( ref_cui in decision_profiles ):
-            for( technique in decision_profiles[ ref_cui ] ):
-                for( cui in decision_profiles[ ref_cui ][ technique ] ] ):
+        for ref_cui in decision_profiles:
+            for technique in decision_profiles[ ref_cui ]:
+                for cui in decision_profiles[ ref_cui ][ technique ]:
                     decision_profiles[ ref_cui ][ technique ][ cui ] = decision_profiles[ ref_cui ][ technique ][ cui ] / census[ ref_cui ]
         ## Save the data structure for the test phase
         pickle.dump( [ census ,
@@ -476,15 +476,11 @@ if __name__ == '__main__':
     parser.add_argument( '--classifier-rank-file' , default = None ,
                          dest = 'rankFile' ,
                          help = 'File containing the classifiers ranked in the best to worst performance order (used to break ties)' )
-    parser.add_argument( '--min-votes' ,
-                         default = 1 ,
-                         dest = 'minVotes' ,
-                         help = 'Minimum numbers of votes required to win a (majority) vote' )
     parser.add_argument( '--zero-strategy' ,
                          default = 'CUI-less' ,
                          choices = [ 'drop' , 'CUI-less' ] ,
                          dest = 'zeroStrategy' ,
-                         help = 'When no normalizations receives enough votes, use this strategy to select a normalization' )
+                         help = 'When no normalizations surpasses the decision profile simularity threshold, use this strategy to select a normalization' )
     parser.add_argument( '--overlap-strategy' ,
                          default = 'rank' ,
                          ## TODO - support additional strategies
@@ -492,6 +488,12 @@ if __name__ == '__main__':
                          choices = [ 'rank' ] ,
                          dest = 'overlapStrategy' ,
                          help = 'Strategy for resolving conflicts of span overlap between annotations when using the span as the voting unit' )
+    parser.add_argument( '--classifier-weight-strategy' ,
+                         default = 'balanced' ,
+                         ## TODO - support additional strategies
+                         choices = [ 'balanced' , 'ranked' ] ,
+                         dest = 'weighting' ,
+                         help = 'Strategy for weighting the relative importance of each classifier (ranked = 1/rank)' )
     parser.add_argument( '--voting-unit' ,
                          default = 'span' ,
                          choices = [ 'span' , 'sentence' , 'doc' ] ,
@@ -520,7 +522,7 @@ if __name__ == '__main__':
     else:
         log.basicConfig( format="%(levelname)s: %(message)s" )
     ##
-    args.minVotes = int( args.minVotes )
+    args.partialMatchWeight = float( args.partialMatchWeight )
     ## In order to support quoted and unquoted classifier lists, we'll
     ## check if there is a single argument and it contains a space. If
     ## so, we can assume it is safe to explode the first arg and
