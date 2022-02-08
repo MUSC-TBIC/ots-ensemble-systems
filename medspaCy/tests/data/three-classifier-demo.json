@@ -1,0 +1,39 @@
+{
+   "Asthma" : {
+      "SVM-1" : {
+         "Asthma" : 0.5,
+         "CAD" : 0.5
+      },
+      "SVM-2" : {
+         "Asthma" : 1
+      },
+      "SVM-3" : {
+         "Asthma" : 1
+      }
+   },
+   "CAD" : {
+      "SVM-1" : {
+         "CAD" : 0.5,
+         "GERD" : 0.5
+      },
+      "SVM-3" : {
+         "CAD" : 1
+      }
+   },
+   "GERD" : {
+      "SVM-1" : {
+         "GERD" : 1
+      },
+      "SVM-2" : {
+         "GERD" : 1
+      },
+      "SVM-3" : {
+         "GERD" : 1
+      }
+   },
+   "NONE" : {
+      "SVM-2" : {
+         "CAD" : 1
+      }
+   }
+}

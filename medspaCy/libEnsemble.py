@@ -27,14 +27,12 @@ def cosine_profiles( decision_profile ,
                 if( template_type in decision_profile[ classifier ] ):
                     dotProduct += weight
                 normB += ( weight ** 2 )
-    ##print( '{} / ( {} * {} )'.format( dotProduct ,
-    ##                                  normA , normB ) )
     if( normB == 0 ):
         ##print( '{}\n\n{}'.format( decision_profile ,
         ##                          decision_template ) )
         return( 0.0 )
     cosine_sim = dotProduct / ( sqrt( normA ) * sqrt( normB ) )
-    return( dotProduct )
+    return( cosine_sim )
 
 
 def cosineSpannedVotes( cas ,
