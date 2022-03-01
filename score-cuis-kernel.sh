@@ -105,6 +105,7 @@ echo "${METHOD}	${CLASSIFIERS}	${ACCURACY}${COVERAGE}${MINVOTES}	all" \
 
 
 export METHOD=decisionTemplate
+export MODEL_DIR=${RESULT_DIR}/${TASK}/${METHOD}-models
 export MINVOTES=1
 ## TODO - We don't use thresholding for decision templates yet
 for MINTHRESHOLD in 0.0
@@ -194,7 +195,7 @@ do
         --classifier-list ${CLASSIFIERS} \
         --min-votes ${MINVOTES} \
         --overlap-strategy rank \
-        --rank-file ${RESULT_DIR}/${TASK}/rankedClassifiersTop.csv \
+        --rank-file ${RESULT_DIR}/${TASK}/rankedClassifiersTop-voting.csv \
         --zero-strategy drop \
         --output-dir ${SYS_DIR}
 
