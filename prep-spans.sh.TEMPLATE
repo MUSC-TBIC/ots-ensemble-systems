@@ -14,25 +14,25 @@ export I2B2_2009_DIR=/data/i2b2_corpora/2009_i2b2_challenge_medications
 
 ## I2B2_2009_DIR
 ## |-- test_annotations/
-##     `-- converted.noduplicates.sorted/
-##         |-- 106650.<team names>.m
-##         |-- ...
-##         `-- 995723.<team names>.m
+## |   `-- converted.noduplicates.sorted/
+## |       |-- 106650.<team names>.m
+## |       |-- ...
+## |       `-- 995723.<team names>.m
 ## |-- test_corpus/
-##     |-- 101427
-##     |-- ...
-##     `-- 997311
+## |   |-- 101427
+## |   |-- ...
+## |   `-- 997311
 ## |-- training_annotations/
-##     |-- 11995_gold.entries
-##     |-- ...
-##     `-- 379569_gold.entries
+## |   |-- 11995_gold.entries
+## |   |-- ...
+## |   `-- 379569_gold.entries
 ## |-- training_corpus/
-##     |-- 1/
-##     |   |-- 106886
-##     |   |-- ...
-##     |   `-- 360326
-##     |-- ...
-##     `-- 10/
+## |   |-- 1/
+## |   |   |-- 106886
+## |   |   |-- ...
+## |   |   `-- 360326
+## |   |-- ...
+## |   `-- 10/
 ## `-- team_submissions/top_subs/
 ##     |-- Aronson_NLM_1
 ##     |-- ...
@@ -43,7 +43,7 @@ export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
 
 mkdir -p "${RESULT_DIR}/${TASK}"
 
-echo "Method	Classifiers	MatchFlag	Recall	Precision	F1	MinVote" \
+echo "Method	Classifiers	MatchFlag	Recall	Precision	F1	MinVote	Split" \
      > ${RESULT_FILE}
 
 ## RESULT_DIR/2009_i2b2_medications
@@ -94,6 +94,82 @@ ${ENSEMBLE_CONDA}/bin/python3 \
     --voting-unit span \
     --ref-dir ${REF_DIR}
 
+
+export METHOD=decisionTemplate
+export MODEL_DIR=${RESULT_DIR}/${TASK}/${METHOD}-models
+mkdir -p ${MODEL_DIR}
+export MINVOTES=1
+for CLASSIFIERS in {1..10}
+do
+    export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}
+    export SYS_TRAIN_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}/train
+    export SYS_TEST_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}/test
+    mkdir -p ${SYS_DIR}
+    mkdir -p ${SYS_TRAIN_DIR}
+    mkdir -p ${SYS_TEST_DIR}
+    
+    ## Train Decision Template ensemble system
+    ${ENSEMBLE_CONDA}/bin/python3 \
+            ${ENSEMBLE_DIR}/medspaCy/decision-template.py \
+            --types-dir ${ENSEMBLE_DIR}/types \
+            --phase train \
+            --voting-unit span \
+            --input-dir "${MERGED_OUT}" \
+            --classifier-list ${CLASSIFIERS} \
+            --overlap-strategy rank \
+            --zero-strategy drop \
+            --decision-profiles-file "${MODEL_DIR}/${MINVOTES}_${CLASSIFIERS}.pkl"
+    
+    ## Test Decision Template ensemble system
+    ${ENSEMBLE_CONDA}/bin/python3 \
+            ${ENSEMBLE_DIR}/medspaCy/decision-template.py \
+            --types-dir ${ENSEMBLE_DIR}/types \
+            --phase test \
+            --voting-unit span \
+            --input-dir "${MERGED_OUT}" \
+            --classifier-list ${CLASSIFIERS} \
+            --overlap-strategy rank \
+            --zero-strategy drop \
+            --decision-profiles-file "${MODEL_DIR}/${MINVOTES}_${CLASSIFIERS}.pkl" \
+            --output-dir ${SYS_DIR}
+
+    ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
+      --reference-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
+      --reference-input ${REF_DIR} \
+      --test-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
+      --test-input ${SYS_TRAIN_DIR} \
+      --file-suffix ".xmi" \
+      --fuzzy-match-flags exact partial \
+      --metrics TP FP FN TN Recall Precision F1 \
+      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_train.log
+
+    export EXACT_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_train.log | cut -f 6- | head -n 1 | tr '\n' '\t'`
+    export PARTIAL_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_train.log | cut -f 6- | tail -n 1 | tr '\n' '\t'`
+    
+    echo "${METHOD}	${CLASSIFIERS}	Exact	${EXACT_RECPRECF1}${MINVOTES}	trn" \
+        >> ${RESULT_FILE}
+    echo "${METHOD}	${CLASSIFIERS}	Partial	${PARTIAL_RECPRECF1}${MINVOTES}	trn" \
+        >> ${RESULT_FILE}
+
+     ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
+      --reference-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
+      --reference-input ${REF_DIR} \
+      --test-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
+      --test-input ${SYS_TEST_DIR} \
+      --file-suffix ".xmi" \
+      --fuzzy-match-flags exact partial \
+      --metrics TP FP FN TN Recall Precision F1 \
+      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_test.log
+
+    export EXACT_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_test.log | cut -f 6- | head -n 1 | tr '\n' '\t'`
+    export PARTIAL_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_test.log | cut -f 6- | tail -n 1 | tr '\n' '\t'`
+    
+    echo "${METHOD}	${CLASSIFIERS}	Exact	${EXACT_RECPRECF1}${MINVOTES}	tst" \
+        >> ${RESULT_FILE}
+    echo "${METHOD}	${CLASSIFIERS}	Partial	${PARTIAL_RECPRECF1}${MINVOTES}	tst" \
+        >> ${RESULT_FILE}
+done
+
 export METHOD=voting
 export MINVOTES=1
 for CLASSIFIERS in {1..10}
@@ -126,8 +202,8 @@ do
     export EXACT_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | cut -f 6- | head -n 1 | tr '\n' '\t'`
     export PARTIAL_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | cut -f 6- | tail -n 1 | tr '\n' '\t'`
     
-    echo "${METHOD}	${CLASSIFIERS}	Exact	${EXACT_RECPRECF1}${MINVOTES}" \
+    echo "${METHOD}	${CLASSIFIERS}	Exact	${EXACT_RECPRECF1}${MINVOTES}	all" \
         >> ${RESULT_FILE}
-    echo "${METHOD}	${CLASSIFIERS}	Partial	${PARTIAL_RECPRECF1}${MINVOTES}" \
+    echo "${METHOD}	${CLASSIFIERS}	Partial	${PARTIAL_RECPRECF1}${MINVOTES}	all" \
         >> ${RESULT_FILE}
 done

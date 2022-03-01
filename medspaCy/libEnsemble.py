@@ -130,6 +130,70 @@ def tallySpannedVotes( cas ,
     return( cas )
 
 
+def cosineDocVotes( cas ,
+                    NoteNlp ,
+                    kb ,
+                    decisionProfiles ,
+                    classifiers ,
+                    attribute_list ,
+                    zeroStrategy ):
+    ##print( '{}'.format( decisionProfiles ) )
+    ## TODO - add thresholding as a configurable option
+    threshold = 0.0
+    for concept in kb:
+        max_attrib_vals = {}
+        max_attrib_sims = {}
+        ####
+        for attribute in attribute_list:
+            decision_profile = kb[ concept ][ attribute ][ 'decision_profile' ]
+            for template_type in decisionProfiles[ attribute ]:
+                decision_template = decisionProfiles[ attribute ][ template_type ]
+                cosine_sim = cosine_profiles( decision_profile ,
+                                              decision_template )
+                if( attribute not in max_attrib_vals ):
+                    max_attrib_vals[ attribute ] = template_type
+                    max_attrib_sims[ attribute ] = cosine_sim
+                elif( cosine_sim > max_attrib_sims[ attribute ] ):
+                    max_attrib_vals[ attribute ] = template_type
+                    max_attrib_sims[ attribute ] = cosine_sim
+                elif( cosine_sim == max_attrib_sims[ attribute ] ):
+                    ## For ties, we want to treat the most extreme or
+                    ## noticable value as the preferred value.
+                    ## -1 > 1 > 0
+                    if( ( int( max_attrib_vals[ attribute ] ) == 0 ) or
+                        ( int( max_attrib_vals[ attribute ] ) == 1 and
+                          template_type == -1 ) ):
+                        max_attrib_vals[ attribute ] = template_type
+                        max_attrib_sims[ attribute ] = cosine_sim
+            if( zeroStrategy == 'drop' and
+                max_attrib_sims[ attribute ] < threshold ):
+                continue
+        ## TODO - Current scoring can only support a single key/value
+        ## pair in the term_modifiers attribute
+        ## modifiers = [ 'cosineSimularity={}'.format( max_cui_sim ) ,
+        ##              'weighted_confidence={}'.format( int( concept_weight ) / len( classifiers ) ) ]
+        modifiers = []
+        term_exists = True
+        if( 'polarity' in attribute_list ):
+            if( int( max_attrib_vals[ 'polarity' ] ) == -1 ):
+                term_exists = False
+        if( 'uncertainty' in attribute_list ):
+            modifiers.append( 'uncertainty={}'.format( int( max_attrib_vals[ 'uncertainty' ] ) ) )
+        else:
+            modifiers.append( 'uncertainty={}'.format( 0 ) )
+        note_nlp = NoteNlp( begin = 0 ,
+                            end = 0 ,
+                            offset = 0 ,
+                            nlp_system = 'Decision Template Ensemble System' ,
+                            ## TODO - map this correctly to a CUI
+                            note_nlp_source_concept_id = concept ,
+                            term_exists = term_exists ,
+                            term_modifiers = ';'.join( modifiers ) )
+        cas.add_annotation( note_nlp )
+    ####
+    return( cas )
+
+
 def tallyDocVotes( cas ,
                    NoteNlp ,
                    kb ,

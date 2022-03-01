@@ -14,7 +14,7 @@ import cassis
 import pickle
 
 from libTypeSystem import loadTypeSystem
-from libEnsemble import cosineSpannedVotes
+from libEnsemble import cosineSpannedVotes, cosineDocVotes
 
 def main( args , classifiers ):
     ############################
@@ -28,8 +28,8 @@ def main( args , classifiers ):
     ## input directory or from the contents of --file-list
     filenames = []
     if( args.fileList is None ):
-        filenames = [ os.path.basename( f ) for f in glob.glob( os.path.join( args.inputDir ,
-                                                                              '*.xmi' ) ) ]
+        filenames = sorted( [ os.path.basename( f ) for f in glob.glob( os.path.join( args.inputDir ,
+                                                                                      '*.xmi' ) ) ] )
     else:
         with open( args.fileList , 'r' ) as fp:
             for line in fp:
@@ -53,11 +53,26 @@ def main( args , classifiers ):
     ####
     if( trainPhase ):
         census = {}
-        census[ 'NONE' ] = 0
         decision_profiles = {}
-        decision_profiles[ 'NONE' ] = {}
+        if( args.votingUnit == 'span' ):
+            census[ 'NONE' ] = 0
+            decision_profiles[ 'NONE' ] = {}
+        elif( args.votingUnit == 'doc' ):
+            for attribute in attribute_list:
+                census[ attribute ] = {}
+                census[ attribute ][ '0' ] = 0
+                census[ attribute ][ 'NONE' ] = 0
+                decision_profiles[ attribute ] = {}
+                decision_profiles[ attribute ][ '0' ] = {}
+                decision_profiles[ attribute ][ 'NONE' ] = {}
+        elif( args.votingUnit == 'sentence' ):
+            ## TODO - how is this different from spans?
+            census[ 'NONE' ] = 0
+            decision_profiles[ 'NONE' ] = {}
     else:
         census , decision_profiles = pickle.load( open( args.decisionProfilesPkl , 'rb' ) )
+    trainModFlag = 0
+    fileCount = 0
     ## Iterate over the files, covert to CAS, and write the XMI to disk
     for filename in tqdm( filenames ,
                           desc = 'Collecting Profiles (k={})'.format( len( classifiers ) ) ):
@@ -134,6 +149,20 @@ def main( args , classifiers ):
                 log.warning( 'File \'{}\' does not contain any annotations matching the provided list of classifiers ({})'.format( filename ,
                                                                                                                                    provided_classifiers ) )
                 continue
+            trainModFlag += 1
+            if( trainPhase ):
+                if( trainModFlag % 10 in [ 0 , 1 , 2 , 3 , 4 , 5 , 6 ] ):
+                    fileCount += 1
+                else:
+                    continue
+            else:
+                if( trainModFlag % 10 in [ 7 , 8 , 9 ] ):
+                    fileCount += 1
+                ## Run on all train and test files but write them to
+                ## different folders so we get a score but still keep
+                ## our workbench a little cleaner
+                ##else:
+                ##    1
             for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
                 technique = annot.discoveryTechnique
                 if( ( trainPhase and technique != '0' ) or
@@ -168,25 +197,96 @@ def main( args , classifiers ):
                     if( cui not in census ):
                         census[ cui ] = 0
                         decision_profiles[ cui ] = {}
-                    census[ cui ] += 1
+                    ##census[ cui ] += 1
                     kb[ span ][ 'reference_type' ] = cui
                 else:
                     kb[ span ][ 'decision_profile' ][ technique ] = {}
                     kb[ span ][ 'decision_profile' ][ technique ][ cui ] = weight
         elif( args.votingUnit == 'doc' ):
+            ## For the doc-based voting, we want to seed the kb with
+            ## the concept attribute types and values during training
+            ## and our top ranked classifier during testing. If no
+            ## rank file is given, then we'll just sort classifiers by
+            ## their order provided at the command line.
+            top_classifier_id = None
+            provided_classifiers = None
+            if( args.rankFile is None ):
+                provided_classifiers = ', '.join( classifiers )
+                for classifier_name in classifiers:
+                    if( classifier_name  in id2classifier ):
+                        top_classifier_id = classifier_name
+                        break
+            else:
+                provided_classifiers = ', '.join( ranked_classifiers )
+                for classifier_name in ranked_classifiers:
+                    if( classifier_name in classifier2id ):
+                        top_classifier_id = classifier2id[ classifier_name ]
+                        break
+            if( top_classifier_id is None ):
+                ## TODO - provide option to not write a file if not classifiers available to vote
+                log.warning( 'File \'{}\' does not contain any annotations matching the provided list of classifiers ({})'.format( filename ,
+                                                                                                                                   provided_classifiers ) )
+                continue
+            trainModFlag += 1
+            if( trainPhase ):
+                if( trainModFlag % 10 in [ 0 , 1 , 2 , 3 , 4 , 5 , 6 ] ):
+                    fileCount += 1
+                else:
+                    continue
+            else:
+                if( trainModFlag % 10 in [ 7 , 8 , 9 ] ):
+                    fileCount += 1
+                ## Run on all train and test files but write them to
+                ## different folders so we get a score but still keep
+                ## our workbench a little cleaner
+                ##else:
+                ##    1
+            ####
+            if( not trainPhase and args.weighting == 'ranked' ):
+                weight = 1 / int( technique )
+            else:
+                weight = 1
             for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
+                technique = annot.discoveryTechnique
+                if( ( trainPhase and technique != '0' ) or
+                    ( not trainPhase and technique != top_classifier_id ) ):
+                    continue
                 ## TODO - refactor how we extract the concept name
                 ##        when this is ported to use real CUIs
                 concept = annot.ontologyConceptArray
-                if( concept in kb ):
-                    continue
-                kb[ concept ] = {}
-                kb[ concept ][ 'norm_counts' ] = 0
-                kb[ concept ][ 'norm_weights' ] = 0
+                if( concept not in kb ):
+                    kb[ concept ] = {}
+                ####
+                attribute_values = {}
+                if( 'polarity' in attribute_list ):
+                    attribute_values[ 'polarity' ] = annot.polarity
+                else:
+                    attribute_values[ 'polarity' ] = '0'
+                ####
+                if( 'uncertainty' in attribute_list ):
+                    attribute_values[ 'uncertainty' ] = annot.uncertainty
+                else:
+                    attribute_values[ 'uncertainty' ] = '0'
+                ####
                 for attribute in attribute_list:
-                    kb[ concept ][ attribute ] = {}
-                    kb[ concept ][ attribute ][ 'norm_counts' ] = {}
-                    kb[ concept ][ attribute ][ 'norm_weights' ] = {}
+                    if( attribute not in kb[ concept ] ):
+                        kb[ concept ][ attribute ] = {}
+                        kb[ concept ][ attribute ][ 'decision_profile' ] = {}
+                    ##
+                    attrib_val = attribute_values[ attribute ]
+                    ## During training, track the global frequency of
+                    ## attributes and values
+                    if( trainPhase ):
+                        if( attribute not in census ):
+                            census[ attribute ] = {}
+                            decision_profiles[ attribute ] = {}
+                        if( attrib_val not in census[ attribute ] ):
+                            census[ attribute ][ attrib_val ] = 0
+                        kb[ concept ][ attribute ][ 'reference_type' ] = attrib_val
+                    else:
+                        kb[ concept ][ attribute ][ 'decision_profile' ][ technique ] = {}
+                        kb[ concept ][ attribute ][ 'decision_profile' ][ technique ][ attrib_val ] = weight
+
         ## Grab all...
         for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
             technique = annot.discoveryTechnique
@@ -223,27 +323,52 @@ def main( args , classifiers ):
                 weight = 1
             ######################################################
             if( args.votingUnit == 'doc' ):
-                attribute_values = {}
+                if( concept not in kb ):
+                    kb[ concept ] = {}
                 ####
+                attribute_values = {}
                 if( 'polarity' in attribute_list ):
                     attribute_values[ 'polarity' ] = annot.polarity
                 else:
-                    attribute_values[ 'polarity' ] = 0
+                    attribute_values[ 'polarity' ] = '0'
                 ####
                 if( 'uncertainty' in attribute_list ):
                     attribute_values[ 'uncertainty' ] = annot.uncertainty
                 else:
-                    attribute_values[ 'uncertainty' ] = 0
+                    attribute_values[ 'uncertainty' ] = '0'
                 ####
-                kb[ concept ][ 'norm_counts' ] += 1
-                kb[ concept ][ 'norm_weights' ] += weight
                 for attribute in attribute_list:
                     attrib_val = attribute_values[ attribute ]
-                    if( attrib_val not in kb[ concept ][ attribute ][ 'norm_counts' ] ):
-                        kb[ concept ][ attribute ][ 'norm_counts' ][ attrib_val ] = 0
-                        kb[ concept ][ attribute ][ 'norm_weights' ][ attrib_val ] = 0
-                    kb[ concept ][ attribute ][ 'norm_counts' ][ attrib_val ] += 1
-                    kb[ concept ][ attribute ][ 'norm_weights' ][ attrib_val ] += weight
+                    ##
+                    if( attribute not in kb[ concept ] ):
+                        kb[ concept ][ attribute ] = {}
+                        ## We treat underspecified attributes as zero
+                        kb[ concept ][ attribute ][ 'reference_type' ] = '0'
+                        kb[ concept ][ attribute ][ 'decision_profile' ] = {}
+                    kb[ concept ][ attribute ][ 'decision_profile' ][ technique ] = {}
+                    kb[ concept ][ attribute ][ 'decision_profile' ][ technique ][ attrib_val ] = weight
+                    ## During training, increment the global frequency of
+                    ## attributes and values
+                    if( trainPhase ):
+                        if( attribute not in census ):
+                            census[ attribute ] = {}
+                        if( attrib_val not in census[ attribute ] ):
+                            census[ attribute ][ attrib_val ] = 0
+                        census[ attribute ][ attrib_val ] += 1
+                        ref_attrib_val = kb[ concept ][ attribute ][ 'reference_type' ]
+                        if( attribute in decision_profiles ):
+                            if( ref_attrib_val not in decision_profiles[ attribute ] ):
+                                ## Is this even possible?
+                                decision_profiles[ attribute ][ ref_attrib_val ] = {}
+                            ##
+                            if( technique not in decision_profiles[ attribute ][ ref_attrib_val ] ):
+                                decision_profiles[ attribute ][ ref_attrib_val ][ technique ] = {}
+                            if( attrib_val not in decision_profiles[ attribute ][ ref_attrib_val ][ technique ] ):
+                                decision_profiles[ attribute ][ ref_attrib_val ][ technique ][ attrib_val ] = 0
+                            decision_profiles[ attribute ][ ref_attrib_val ][ technique ][ attrib_val ] += weight
+                        else:
+                            ## TODO - how do we resolve this?
+                            1
             elif( span in kb ):
                 if( cui not in kb[ span ][ 'norm_counts' ] ):
                     kb[ span ][ 'norm_counts' ][ cui ] = 0
@@ -413,29 +538,48 @@ def main( args , classifiers ):
                                           args.votingUnit ,
                                           args.zeroStrategy )
             elif( args.votingUnit == 'doc' ):
-                cas = tallyDocVotes( cas ,
-                                     NoteNlp ,
-                                     kb ,
-                                     classifiers ,
-                                     attribute_list ,
-                                     args.minVotes ,
-                                     args.zeroStrategy )
+                cas = cosineDocVotes( cas ,
+                                      NoteNlp ,
+                                      kb ,
+                                      decision_profiles ,
+                                      classifiers ,
+                                      attribute_list ,
+                                      args.zeroStrategy )
             ################
             if( args.outputDir is not None ):
-                cas.to_xmi( path = os.path.join( args.outputDir , xmi_filename ) ,
+                if( trainModFlag % 10 in [ 0 , 1 , 2 , 3 , 4 , 5 , 6 ] ):
+                    output_path = os.path.join( args.outputDir , 'train' , xmi_filename )
+                else:                
+                    output_path = os.path.join( args.outputDir , 'test' , xmi_filename )
+                ##
+                cas.to_xmi( path = output_path ,
                             pretty_print = True )
     ####
     if( trainPhase ):
+        log.info( 'Trained on {} files'.format( fileCount ) )
         ## Normalize the weights for a decision profile against
         ## the global frequency of a given annotation type
-        for ref_cui in decision_profiles:
-            for technique in decision_profiles[ ref_cui ]:
-                for cui in decision_profiles[ ref_cui ][ technique ]:
-                    decision_profiles[ ref_cui ][ technique ][ cui ] = decision_profiles[ ref_cui ][ technique ][ cui ] / census[ ref_cui ]
+        if( args.votingUnit == 'sentence' or
+            args.votingUnit == 'span' ):
+            ## TODO - Are sentence decision profiles different?
+            for ref_cui in decision_profiles:
+                for technique in decision_profiles[ ref_cui ]:
+                    for cui in decision_profiles[ ref_cui ][ technique ]:
+                        decision_profiles[ ref_cui ][ technique ][ cui ] = decision_profiles[ ref_cui ][ technique ][ cui ] / census[ ref_cui ]
+        elif( args.votingUnit == 'doc' ):
+            for attribute in decision_profiles:
+                for ref_attrib_val in decision_profiles[ attribute ]:
+                    for technique in decision_profiles[ attribute ][ ref_attrib_val ]:
+                        for attrib_val in decision_profiles[ attribute ][ ref_attrib_val ][ technique ]:
+                            technique_frequency = decision_profiles[ attribute ][ ref_attrib_val ][ technique ][ attrib_val ]
+                            global_frequency = census[ attribute ][ attrib_val ]
+                            decision_profiles[ attribute ][ ref_attrib_val ][ technique ][ attrib_val ] = technique_frequency / global_frequency
         ## Save the data structure for the test phase
         pickle.dump( [ census ,
                        decision_profiles ] ,
                      open( args.decisionProfilesPkl , 'wb' ) )
+    else:
+        log.info( 'Testing on {} files'.format( fileCount ) )
 
 
 if __name__ == '__main__':
@@ -520,7 +664,8 @@ if __name__ == '__main__':
         log.info( "Verbose output." )
         log.debug( "{}".format( args ) )
     else:
-        log.basicConfig( format="%(levelname)s: %(message)s" )
+        log.basicConfig( format="%(levelname)s: %(message)s" ,
+                         level = log.INFO )
     ##
     args.partialMatchWeight = float( args.partialMatchWeight )
     ## In order to support quoted and unquoted classifier lists, we'll
