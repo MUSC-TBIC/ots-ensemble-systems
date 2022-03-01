@@ -159,8 +159,10 @@ def cosineDocVotes( cas ,
                 elif( cosine_sim == max_attrib_sims[ attribute ] ):
                     ## For ties, we want to treat the most extreme or
                     ## noticable value as the preferred value.
-                    ## -1 > 1 > 0
-                    if( ( int( max_attrib_vals[ attribute ] ) == 0 ) or
+                    ## -1 > 1 > 0 > None
+                    if( ( max_attrib_vals[ attribute ] == 'None' ) or
+                        ( int( max_attrib_vals[ attribute ] ) == 0 and
+                          template_type in [ 1 , -1 ] ) or
                         ( int( max_attrib_vals[ attribute ] ) == 1 and
                           template_type == -1 ) ):
                         max_attrib_vals[ attribute ] = template_type
