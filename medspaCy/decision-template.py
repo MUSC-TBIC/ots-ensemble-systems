@@ -197,7 +197,6 @@ def main( args , classifiers ):
                     if( cui not in census ):
                         census[ cui ] = 0
                         decision_profiles[ cui ] = {}
-                    ##census[ cui ] += 1
                     kb[ span ][ 'reference_type' ] = cui
                 else:
                     kb[ span ][ 'decision_profile' ][ technique ] = {}
@@ -378,6 +377,9 @@ def main( args , classifiers ):
                 kb[ span ][ 'decision_profile' ][ technique ] = {}
                 kb[ span ][ 'decision_profile' ][ technique ][ cui ] = weight
                 if( trainPhase ):
+                    if( cui not in census ):
+                        census[ cui ] = 0
+                    census[ cui ] += 1
                     ref_cui = kb[ span ][ 'reference_type' ]
                     if( ref_cui in decision_profiles ):
                         if( technique not in decision_profiles[ ref_cui ] ):
@@ -412,6 +414,9 @@ def main( args , classifiers ):
                         kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
                         kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
                         if( trainPhase ):
+                            if( cui not in census ):
+                                census[ cui ] = 0
+                            census[ cui ] += 1
                             if( ref_cui in decision_profiles ):
                                 if( technique not in decision_profiles[ ref_cui ] ):
                                     decision_profiles[ ref_cui ][ technique ] = {}
@@ -436,6 +441,9 @@ def main( args , classifiers ):
                         kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
                         kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
                         if( trainPhase ):
+                            if( cui not in census ):
+                                census[ cui ] = 0
+                            census[ cui ] += 1
                             if( ref_cui in decision_profiles ):
                                 if( technique not in decision_profiles[ ref_cui ] ):
                                     decision_profiles[ ref_cui ][ technique ] = {}
@@ -460,6 +468,9 @@ def main( args , classifiers ):
                         kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
                         kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
                         if( trainPhase ):
+                            if( cui not in census ):
+                                census[ cui ] = 0
+                            census[ cui ] += 1
                             if( ref_cui in decision_profiles ):
                                 if( technique not in decision_profiles[ ref_cui ] ):
                                     decision_profiles[ ref_cui ][ technique ] = {}
@@ -484,6 +495,9 @@ def main( args , classifiers ):
                         kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
                         kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
                         if( trainPhase ):
+                            if( cui not in census ):
+                                census[ cui ] = 0
+                            census[ cui ] += 1
                             if( ref_cui in decision_profiles ):
                                 if( technique not in decision_profiles[ ref_cui ] ):
                                     decision_profiles[ ref_cui ][ technique ] = {}
@@ -565,7 +579,13 @@ def main( args , classifiers ):
             for ref_cui in decision_profiles:
                 for technique in decision_profiles[ ref_cui ]:
                     for cui in decision_profiles[ ref_cui ][ technique ]:
-                        decision_profiles[ ref_cui ][ technique ][ cui ] = decision_profiles[ ref_cui ][ technique ][ cui ] / census[ ref_cui ]
+                        technique_frequency = decision_profiles[ ref_cui ][ technique ][ cui ]
+                        global_frequency = census[ ref_cui ]
+                        if( global_frequency == 0 ):
+                            ## TODO - verify all possible paths for this to be zero are valid
+                            decision_profiles[ ref_cui ][ technique ][ cui ] = 0
+                        else:
+                            decision_profiles[ ref_cui ][ technique ][ cui ] = technique_frequency / global_frequency
         elif( args.votingUnit == 'doc' ):
             for attribute in decision_profiles:
                 for ref_attrib_val in decision_profiles[ attribute ]:
