@@ -1,6 +1,16 @@
 #!/bin/bash
 
 #############################################
+## 2 (n-15) classifiers
+export MAXVOTES=2
+
+export CLASSIFIERS="1 14"
+./score-context-attributes-kernel.sh
+
+export CLASSIFIERS="2 14"
+./score-context-attributes-kernel.sh
+
+#############################################
 ## All 17 (n) classifiers
 export MAXVOTES=17
 
