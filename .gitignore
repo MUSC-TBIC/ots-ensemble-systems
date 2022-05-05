@@ -14,10 +14,23 @@ data/
 \.\#*
 
 # ############################
+# Locally customized shell scripts
+
+prep-context-attributes.sh
+score-context-attributes.sh
+
+prep-cuis.sh
+score-cuis.sh
+
+prep-spans.sh
+score-spans.sh
+
+# ############################
 # Java errata files
 
 bin/
 target/
+*.class
 *.jar
 
 # #############

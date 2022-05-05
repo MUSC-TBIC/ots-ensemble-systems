@@ -43,7 +43,7 @@ public class StackFeature {
         writeFile(outFile, inst);
         
     }
-    
+    //reads in file and store them to inst
     public static void readInst(String fileName, ArrayList<String> inst, TreeSet<Integer> set) {
 
         File f = new File(fileName);
@@ -56,9 +56,11 @@ public class StackFeature {
 
                 while ((str = txtin.readLine()) != null) {
                     //0 2:1.0 4:1.0 6:1.0 8:1.0 10:1.0 12:1.0 14:1.0 16:1.0 182:1.0 192:1.0 
+                	//strA - line
                     String strA[] = str.split(" ");
                     String label = strA[0];
                     StringBuilder sb = new StringBuilder();
+                    //sb LABEL + " "
                     sb.append(label + " ");
                     for (int i = 1; i < strA.length; i++) {
                         String tStrA[] = strA[i].split(":");
@@ -68,6 +70,7 @@ public class StackFeature {
                             sb.append(strA[i] + " ");
                         }
                     }
+                    //isnt a list of sb
                     inst.add(sb.toString().trim());
                 }                   
             } catch (Exception ex) {
@@ -82,7 +85,7 @@ public class StackFeature {
         }
 
     }
-        
+    //add count from file to set
     public static void readFeature(String fileName, TreeSet<Integer> set) {
 
         File f = new File(fileName);
@@ -103,7 +106,7 @@ public class StackFeature {
                     String strA[] = str.split(" ");
                     int s = Integer.parseInt(strA[0]);
                     int e = Integer.parseInt(strA[1]);
-                    
+                    //set a set of numbers in strA
                     for (int i = s; i <= e; i++) {
                         set.add(i);
                     }
@@ -126,7 +129,7 @@ public class StackFeature {
         return new PrintWriter (new BufferedWriter
                 (new FileWriter(file)));
     }
-
+    //write inst to output file
     public static void writeFile(String name, ArrayList<String> inst) {
 
         try {

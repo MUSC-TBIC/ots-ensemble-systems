@@ -1,16 +1,5 @@
 #!/bin/bash
 
-if [[ -z $CLASSIFIERS ]]; then
-    echo "The variable \$CLASSIFIERS is not set"
-    exit 0
-fi
-export SAFE_CLASSIFIERS=`echo $CLASSIFIERS | tr ' ' 'x'`
-
-if [[ -z $MAXVOTES ]]; then
-    echo "The variable \$MAXVOTES is not set"
-    exit 0
-fi
-
 ## Most, if not all, of these environment variables will need to be
 ## customized to match your running environment.
 export ENSEMBLE_DIR=/data/software/ots-ensemble-systems
@@ -23,24 +12,42 @@ export TASK=2009_i2b2_medications
 
 export I2B2_2009_DIR=/data/i2b2_corpora/2009_i2b2_challenge_medications
 
-## I2B2_2008_DIR
-## |-- obesity_annotations_test.xml
-## |-- obesity_annotations_training.xml
-## |-- obesity_annotations_training2.xml
-## |-- obesity_corpus_test.xml
-## |-- obesity_corpus_training.xml
-## |-- obesity_corpus_training2.xml
-## `-- team_submissions/top_subs
-##     |-- prod_123_0_1_nlpoa00WJ
-##     |-- prod_190_0_1_nlpQF1X7H
-##     `-- prod_204_0_3_nlpB1l4ZH
+## I2B2_2009_DIR
+## |-- test_annotations/
+## |   `-- converted.noduplicates.sorted/
+## |       |-- 106650.<team names>.m
+## |       |-- ...
+## |       `-- 995723.<team names>.m
+## |-- test_corpus/
+## |   |-- 101427
+## |   |-- ...
+## |   `-- 997311
+## |-- training_annotations/
+## |   |-- 11995_gold.entries
+## |   |-- ...
+## |   `-- 379569_gold.entries
+## |-- training_corpus/
+## |   |-- 1/
+## |   |   |-- 106886
+## |   |   |-- ...
+## |   |   `-- 360326
+## |   |-- ...
+## |   `-- 10/
+## `-- team_submissions/top_subs/
+##     |-- Aronson_NLM_1
+##     |-- ...
+##     `-- Zweigenbaum_Limsi_1
 
 export RESULT_DIR=/data/experiments/ots-ensemble-paper
 export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
 
+mkdir -p "${RESULT_DIR}/${TASK}"
+
+echo "Method	Classifiers	MatchFlag	Recall	Precision	F1	MinVote	Split" \
+     > ${RESULT_FILE}
+
 ## RESULT_DIR/2009_i2b2_medications
 ## |-- 2009_i2b2_medications_results.csv
-## |-- rankedClassifiersTop.csv
 ## |-- etude
 ## |   |-- voting_1_1.log
 ## |   |-- voting_1_2.log
@@ -61,51 +68,42 @@ export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
 ##     `-- files.xmi
 
 export MERGED_OUT=${RESULT_DIR}/${TASK}/merged
+mkdir -p "${MERGED_OUT}"
+
 export REF_DIR=${RESULT_DIR}/${TASK}/ref
+mkdir -p "${REF_DIR}"
 
-export METHOD=oracle
-export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${SAFE_CLASSIFIERS}
-mkdir -p ${SYS_DIR}
+mkdir -p ${RESULT_DIR}/${TASK}/etude
 
-export MINVOTES=1
+## Merge the oracle/reference annotation with the above classifiers to
+## generate a single input corpus for the meta-classifier ensemble
+## system to read in
+${ENSEMBLE_CONDA}/bin/python3 \
+    ${ENSEMBLE_DIR}/medspaCy/i2b2-2009-medications-converter.py \
+    --input-text ${I2B2_2009_DIR}/test_corpus \
+    --input-ref ${I2B2_2009_DIR}/test_annotations/converted.noduplicates.sorted \
+    --input-systems ${I2B2_2009_DIR}/team_submissions/top_subs \
+    --output-dir ${MERGED_OUT}
 
-## Create an oracle of best possible output
+
+## Create a reference corpus in the same format
 ${ENSEMBLE_CONDA}/bin/python3 \
     ${ENSEMBLE_DIR}/medspaCy/oracle-ensemble.py \
     --types-dir ${ENSEMBLE_DIR}/types \
     --input-dir "${MERGED_OUT}" \
-    --classifier-list ${CLASSIFIERS} \
     --voting-unit span \
-    --output-dir ${SYS_DIR}
-
-${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
-    --reference-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
-    --reference-input ${REF_DIR} \
-    --test-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
-    --test-input ${SYS_DIR} \
-    --file-suffix ".xmi" \
-    --fuzzy-match-flags exact partial \
-    --metrics TP FP FN TN Recall Precision F1 \
-    > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log
-
-export EXACT_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log | cut -f 6- | head -n 1 | tr '\n' '\t'`
-export PARTIAL_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log | cut -f 6- | tail -n 1 | tr '\n' '\t'`
-    
-echo "${METHOD}	${CLASSIFIERS}	Exact	${EXACT_RECPRECF1}${MINVOTES}	all" \
-     >> ${RESULT_FILE}
-echo "${METHOD}	${CLASSIFIERS}	Partial	${PARTIAL_RECPRECF1}${MINVOTES}	all" \
-     >> ${RESULT_FILE}
+    --ref-dir ${REF_DIR}
 
 
 export METHOD=decisionTemplate
 export MODEL_DIR=${RESULT_DIR}/${TASK}/${METHOD}-models
+mkdir -p ${MODEL_DIR}
 export MINVOTES=1
-## TODO - We don't use thresholding for decision templates yet
-for MINTHRESHOLD in 0.0
+for CLASSIFIERS in {1..10}
 do
-    export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${SAFE_CLASSIFIERS}
-    export SYS_TRAIN_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${SAFE_CLASSIFIERS}/train
-    export SYS_TEST_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${SAFE_CLASSIFIERS}/test
+    export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}
+    export SYS_TRAIN_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}/train
+    export SYS_TEST_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}/test
     mkdir -p ${SYS_DIR}
     mkdir -p ${SYS_TRAIN_DIR}
     mkdir -p ${SYS_TEST_DIR}
@@ -120,7 +118,7 @@ do
             --classifier-list ${CLASSIFIERS} \
             --overlap-strategy rank \
             --zero-strategy drop \
-            --decision-profiles-file "${MODEL_DIR}/${MINVOTES}_${SAFE_CLASSIFIERS}.pkl"
+            --decision-profiles-file "${MODEL_DIR}/${MINVOTES}_${CLASSIFIERS}.pkl"
     
     ## Test Decision Template ensemble system
     ${ENSEMBLE_CONDA}/bin/python3 \
@@ -132,7 +130,7 @@ do
             --classifier-list ${CLASSIFIERS} \
             --overlap-strategy rank \
             --zero-strategy drop \
-            --decision-profiles-file "${MODEL_DIR}/${MINVOTES}_${SAFE_CLASSIFIERS}.pkl" \
+            --decision-profiles-file "${MODEL_DIR}/${MINVOTES}_${CLASSIFIERS}.pkl" \
             --output-dir ${SYS_DIR}
 
     ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
@@ -143,10 +141,10 @@ do
       --file-suffix ".xmi" \
       --fuzzy-match-flags exact partial \
       --metrics TP FP FN TN Recall Precision F1 \
-      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}_train.log
+      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_train.log
 
-    export EXACT_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}_train.log | cut -f 6- | head -n 1 | tr '\n' '\t'`
-    export PARTIAL_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}_train.log | cut -f 6- | tail -n 1 | tr '\n' '\t'`
+    export EXACT_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_train.log | cut -f 6- | head -n 1 | tr '\n' '\t'`
+    export PARTIAL_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_train.log | cut -f 6- | tail -n 1 | tr '\n' '\t'`
     
     echo "${METHOD}	${CLASSIFIERS}	Exact	${EXACT_RECPRECF1}${MINVOTES}	trn" \
         >> ${RESULT_FILE}
@@ -161,28 +159,24 @@ do
       --file-suffix ".xmi" \
       --fuzzy-match-flags exact partial \
       --metrics TP FP FN TN Recall Precision F1 \
-      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}_test.log
+      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_test.log
 
-    export EXACT_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}_test.log | cut -f 6- | head -n 1 | tr '\n' '\t'`
-    export PARTIAL_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}_test.log | cut -f 6- | tail -n 1 | tr '\n' '\t'`
+    export EXACT_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_test.log | cut -f 6- | head -n 1 | tr '\n' '\t'`
+    export PARTIAL_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_test.log | cut -f 6- | tail -n 1 | tr '\n' '\t'`
     
     echo "${METHOD}	${CLASSIFIERS}	Exact	${EXACT_RECPRECF1}${MINVOTES}	tst" \
         >> ${RESULT_FILE}
     echo "${METHOD}	${CLASSIFIERS}	Partial	${PARTIAL_RECPRECF1}${MINVOTES}	tst" \
         >> ${RESULT_FILE}
-
 done
 
-
-
-
 export METHOD=voting
-for MINVOTES in $(seq 1 ${MAXVOTES})
+export MINVOTES=1
+for CLASSIFIERS in {1..10}
 do
-
-    export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${SAFE_CLASSIFIERS}
+    export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}
     mkdir -p ${SYS_DIR}
-    
+
     ## Simple voting ensemble system
     ${ENSEMBLE_CONDA}/bin/python3 \
         ${ENSEMBLE_DIR}/medspaCy/voting-ensemble.py \
@@ -192,11 +186,10 @@ do
         --classifier-list ${CLASSIFIERS} \
         --min-votes ${MINVOTES} \
         --overlap-strategy rank \
-        --rank-file ${RESULT_DIR}/${TASK}/rankedClassifiersTop-voting.csv \
         --zero-strategy drop \
         --output-dir ${SYS_DIR}
-    
-    ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
+
+     ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
       --reference-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
       --reference-input ${REF_DIR} \
       --test-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
@@ -204,13 +197,13 @@ do
       --file-suffix ".xmi" \
       --fuzzy-match-flags exact partial \
       --metrics TP FP FN TN Recall Precision F1 \
-      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log
-    
-    export EXACT_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log | cut -f 6- | head -n 1 | tr '\n' '\t'`
-    export PARTIAL_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${SAFE_CLASSIFIERS}.log | cut -f 6- | tail -n 1 | tr '\n' '\t'`
+      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log
+
+    export EXACT_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | cut -f 6- | head -n 1 | tr '\n' '\t'`
+    export PARTIAL_RECPRECF1=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | cut -f 6- | tail -n 1 | tr '\n' '\t'`
     
     echo "${METHOD}	${CLASSIFIERS}	Exact	${EXACT_RECPRECF1}${MINVOTES}	all" \
-      >> ${RESULT_FILE}
+        >> ${RESULT_FILE}
     echo "${METHOD}	${CLASSIFIERS}	Partial	${PARTIAL_RECPRECF1}${MINVOTES}	all" \
-      >> ${RESULT_FILE}
+        >> ${RESULT_FILE}
 done

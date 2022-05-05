@@ -37,7 +37,7 @@ export RESULT_FILE=${RESULT_DIR}/${TASK}/${TASK}_results.csv
 
 mkdir -p "${RESULT_DIR}/${TASK}"
 
-echo "Method	Classifiers	Accuracy	Coverage	MinVote" \
+echo "Method	Classifiers	Accuracy	Coverage	MinVote	Split" \
      > ${RESULT_FILE}
 
 ## RESULT_DIR/2019_n2c2_track3
@@ -94,6 +94,80 @@ ${ENSEMBLE_CONDA}/bin/python3 \
     --ref-dir ${REF_DIR}
 
 
+export METHOD=decisionTemplate
+export MODEL_DIR=${RESULT_DIR}/${TASK}/${METHOD}-models
+mkdir -p ${MODEL_DIR}
+export MINVOTES=1
+for CLASSIFIERS in {1..10}
+do
+    export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}
+    export SYS_TRAIN_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}/train
+    export SYS_TEST_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${CLASSIFIERS}/test
+    mkdir -p ${SYS_DIR}
+    mkdir -p ${SYS_TRAIN_DIR}
+    mkdir -p ${SYS_TEST_DIR}
+
+    ## Train Decision Template ensemble system
+    ${ENSEMBLE_CONDA}/bin/python3 \
+            ${ENSEMBLE_DIR}/medspaCy/decision-template.py \
+            --types-dir ${ENSEMBLE_DIR}/types \
+            --phase train \
+            --voting-unit span \
+            --input-dir "${MERGED_OUT}" \
+            --classifier-list ${CLASSIFIERS} \
+            --overlap-strategy rank \
+            --zero-strategy drop \
+            --decision-profiles-file "${MODEL_DIR}/${MINVOTES}_${CLASSIFIERS}.pkl"
+
+    ## Test Decision Template ensemble system
+    ${ENSEMBLE_CONDA}/bin/python3 \
+            ${ENSEMBLE_DIR}/medspaCy/decision-template.py \
+            --types-dir ${ENSEMBLE_DIR}/types \
+            --phase test \
+            --voting-unit span \
+            --input-dir "${MERGED_OUT}" \
+            --classifier-list ${CLASSIFIERS} \
+            --overlap-strategy rank \
+            --zero-strategy drop \
+            --decision-profiles-file "${MODEL_DIR}/${MINVOTES}_${CLASSIFIERS}.pkl" \
+            --output-dir ${SYS_DIR}
+
+    ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
+      --reference-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
+      --reference-input ${REF_DIR} \
+      --test-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
+      --test-input ${SYS_TRAIN_DIR} \
+      --file-suffix ".xmi" \
+      --fuzzy-match-flags exact \
+      --score-normalization note_nlp_source_concept_id \
+      --metrics Accuracy TP FP FN TN \
+      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_train.log
+
+    export COVERAGE=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_train.log | cut -f 2 | head -n 1 | tr '\n' '\t'`
+    export ACCURACY=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_train.log | cut -f 2 | tail -n 1 | tr '\n' '\t'`
+    
+    echo "${METHOD}	${CLASSIFIERS}	${ACCURACY}${COVERAGE}${MINVOTES}	trn" \
+        >> ${RESULT_FILE}
+
+    ${ETUDE_CONDA}/bin/python3 ${ETUDE_DIR}/etude.py \
+      --reference-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
+      --reference-input ${REF_DIR} \
+      --test-conf ${CONFIG_DIR}/uima/ensemble_note-nlp_xmi.conf \
+      --test-input ${SYS_TEST_DIR} \
+      --file-suffix ".xmi" \
+      --fuzzy-match-flags exact \
+      --score-normalization note_nlp_source_concept_id \
+      --metrics Accuracy TP FP FN TN \
+      > ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_test.log
+
+    export COVERAGE=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_test.log | cut -f 2 | head -n 1 | tr '\n' '\t'`
+    export ACCURACY=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}_test.log | cut -f 2 | tail -n 1 | tr '\n' '\t'`
+    
+    echo "${METHOD}	${CLASSIFIERS}	${ACCURACY}${COVERAGE}${MINVOTES}	tst" \
+        >> ${RESULT_FILE}
+done
+
+
 export METHOD=voting
 export MINVOTES=1
 for CLASSIFIERS in {1..10}
@@ -127,6 +201,6 @@ do
     export COVERAGE=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | cut -f 2 | head -n 1 | tr '\n' '\t'`
     export ACCURACY=`grep micro ${RESULT_DIR}/${TASK}/etude/${METHOD}_${MINVOTES}_${CLASSIFIERS}.log | cut -f 2 | tail -n 1 | tr '\n' '\t'`
     
-    echo "${METHOD}	${CLASSIFIERS}	${ACCURACY}${COVERAGE}${MINVOTES}" \
+    echo "${METHOD}	${CLASSIFIERS}	${ACCURACY}${COVERAGE}${MINVOTES}	all" \
         >> ${RESULT_FILE}
 done
