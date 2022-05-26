@@ -16,6 +16,58 @@ import pickle
 from libTypeSystem import loadTypeSystem
 from libEnsemble import cosineSpannedVotes, cosineDocVotes
 
+
+def seedSpansInKb( cas ,
+                   census ,
+                   decision_profiles ,
+                   kb ,
+                   xmiId2cui ,
+                   annotationTypeString ,
+                   trainPhase ,
+                   top_classifier_id ,
+                   weighting ):
+    ########
+    for annot in cas.select( annotationTypeString ):
+        technique = annot.discoveryTechnique
+        if( ( trainPhase and technique != '0' ) or
+            ( not trainPhase and technique != top_classifier_id ) ):
+            continue
+        begin_offset = annot.begin
+        end_offset = annot.end
+        span = '{}-{}'.format( begin_offset , end_offset )
+        kb[ span ] = {}
+        kb[ span ][ 'begin_offset' ] = begin_offset
+        kb[ span ][ 'end_offset' ] = end_offset
+        kb[ span ][ 'norm_counts' ] = {}
+        kb[ span ][ 'norm_weights' ] = {}
+        kb[ span ][ 'decision_profile' ] = {}
+        try:
+            concept_id = int( annot.ontologyConceptArray )
+            cui = xmiId2cui[ concept_id ]
+        except TypeError as e:
+            ## A TypeError here means occurs when
+            ## ontologyConceptArray is not defined, meaning
+            ## that there is no associated CUI
+            cui = 'span'
+        if( not trainPhase and weighting == 'ranked' ):
+            weight = 1 / int( technique )
+        else:
+            weight = 1
+        kb[ span ][ 'norm_counts' ][ cui ] = 1
+        kb[ span ][ 'norm_weights' ][ cui ] = weight
+        ## During training, track the global frequency of reference
+        ## concepts
+        if( trainPhase ):
+            if( cui not in census ):
+                census[ cui ] = 0
+                decision_profiles[ cui ] = {}
+            kb[ span ][ 'reference_type' ] = cui
+        else:
+            kb[ span ][ 'decision_profile' ][ technique ] = {}
+            kb[ span ][ 'decision_profile' ][ technique ][ cui ] = weight
+    return( census , decision_profiles , kb )
+
+
 def main( args , classifiers ):
     ############################
     trainPhase = False
@@ -163,44 +215,22 @@ def main( args , classifiers ):
                 ## our workbench a little cleaner
                 ##else:
                 ##    1
-            for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
-                technique = annot.discoveryTechnique
-                if( ( trainPhase and technique != '0' ) or
-                    ( not trainPhase and technique != top_classifier_id ) ):
-                    continue
-                begin_offset = annot.begin
-                end_offset = annot.end
-                span = '{}-{}'.format( begin_offset , end_offset )
-                kb[ span ] = {}
-                kb[ span ][ 'begin_offset' ] = begin_offset
-                kb[ span ][ 'end_offset' ] = end_offset
-                kb[ span ][ 'norm_counts' ] = {}
-                kb[ span ][ 'norm_weights' ] = {}
-                kb[ span ][ 'decision_profile' ] = {}
-                try:
-                    concept_id = int( annot.ontologyConceptArray )
-                    cui = xmiId2cui[ concept_id ]
-                except TypeError as e:
-                    ## A TypeError here means occurs when
-                    ## ontologyConceptArray is not defined, meaning
-                    ## that there is no associated CUI
-                    cui = 'span'
-                if( not trainPhase and args.weighting == 'ranked' ):
-                    weight = 1 / int( technique )
-                else:
-                    weight = 1
-                kb[ span ][ 'norm_counts' ][ cui ] = 1
-                kb[ span ][ 'norm_weights' ][ cui ] = weight
-                ## During training, track the global frequency of reference
-                ## concepts
-                if( trainPhase ):
-                    if( cui not in census ):
-                        census[ cui ] = 0
-                        decision_profiles[ cui ] = {}
-                    kb[ span ][ 'reference_type' ] = cui
-                else:
-                    kb[ span ][ 'decision_profile' ][ technique ] = {}
-                    kb[ span ][ 'decision_profile' ][ technique ][ cui ] = weight
+            eventMention_typeString = 'org.apache.ctakes.typesystem.type.textsem.EventMention'
+            modifier_typeString = 'org.apache.ctakes.typesystem.type.textsem.Modifier'
+            timeMention_typeString = 'org.apache.ctakes.typesystem.type.textsem.TimeMention'
+            for annotationTypeString in [ 'textsem.IdentifiedAnnotation' ,
+                                          eventMention_typeString ,
+                                          modifier_typeString ,
+                                          timeMention_typeString ]:
+                census , decision_profiles , kb = seedSpansInKb( cas ,
+                                                                 census ,
+                                                                 decision_profiles ,
+                                                                 kb ,
+                                                                 xmiId2cui ,
+                                                                 annotationTypeString ,
+                                                                 trainPhase ,
+                                                                 top_classifier_id ,
+                                                                 args.weighting )
         elif( args.votingUnit == 'doc' ):
             ## For the doc-based voting, we want to seed the kb with
             ## the concept attribute types and values during training
