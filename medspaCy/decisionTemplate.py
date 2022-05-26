@@ -68,7 +68,278 @@ def seedSpansInKb( cas ,
     return( census , decision_profiles , kb )
 
 
+def processRemainingAnnotations( cas ,
+                                 filename ,
+                                 census ,
+                                 decision_profiles ,
+                                 kb ,
+                                 xmiId2cui ,
+                                 annotationTypeString ,
+                                 trainPhase ,
+                                 classifiers ,
+                                 top_classifier_id ,
+                                 votingUnit ,
+                                 weighting ,
+                                 partialMatchWeight ):
+    ########
+    for annot in cas.select( annotationTypeString ):
+        technique = annot.discoveryTechnique
+        if( technique == '0' or
+            technique not in classifiers or
+            ## We already took care of the top_classifier above
+            ## for span-based voting during the testing phase
+            ( not trainPhase and votingUnit == 'span' and technique == top_classifier_id ) ):
+            continue
+        ## TODO - refactor variable named 'cui' to reflect
+        ##        more fluid use across annotation types
+        if( votingUnit == 'sentence' ):
+            cui = 'section'
+        elif( votingUnit == 'span' ):
+            try:
+                concept_id = int( annot.ontologyConceptArray )
+                cui = xmiId2cui[ concept_id ]
+            except TypeError as e:
+                ## A TypeError here means occurs when
+                ## ontologyConceptArray is not defined, meaning
+                ## that there is no associated CUI
+                cui = 'span'
+        elif( votingUnit == 'doc' ):
+            ## TODO - refactor how we extract the concept name
+            ##        when this is ported to use real CUIs
+            concept = annot.ontologyConceptArray
+        ################
+        begin_offset = annot.begin
+        end_offset = annot.end
+        span = '{}-{}'.format( begin_offset , end_offset )
+        if( weighting == 'ranked' ):
+            weight = 1 / int( technique )
+        else:
+            weight = 1
+        ######################################################
+        if( votingUnit == 'doc' ):
+            if( concept not in kb ):
+                kb[ concept ] = {}
+            ####
+            attribute_values = {}
+            if( 'polarity' in attribute_list ):
+                attribute_values[ 'polarity' ] = annot.polarity
+            else:
+                attribute_values[ 'polarity' ] = '0'
+            ####
+            if( 'uncertainty' in attribute_list ):
+                attribute_values[ 'uncertainty' ] = annot.uncertainty
+            else:
+                attribute_values[ 'uncertainty' ] = '0'
+            ####
+            for attribute in attribute_list:
+                attrib_val = attribute_values[ attribute ]
+                ##
+                if( attribute not in kb[ concept ] ):
+                    kb[ concept ][ attribute ] = {}
+                    ## We treat underspecified attributes as zero
+                    kb[ concept ][ attribute ][ 'reference_type' ] = '0'
+                    kb[ concept ][ attribute ][ 'decision_profile' ] = {}
+                kb[ concept ][ attribute ][ 'decision_profile' ][ technique ] = {}
+                kb[ concept ][ attribute ][ 'decision_profile' ][ technique ][ attrib_val ] = weight
+                ## During training, increment the global frequency of
+                ## attributes and values
+                if( trainPhase ):
+                    if( attribute not in census ):
+                        census[ attribute ] = {}
+                    if( attrib_val not in census[ attribute ] ):
+                        census[ attribute ][ attrib_val ] = 0
+                    census[ attribute ][ attrib_val ] += 1
+                    ref_attrib_val = kb[ concept ][ attribute ][ 'reference_type' ]
+                    if( attribute in decision_profiles ):
+                        if( ref_attrib_val not in decision_profiles[ attribute ] ):
+                            ## Is this even possible?
+                            decision_profiles[ attribute ][ ref_attrib_val ] = {}
+                        ##
+                        if( technique not in decision_profiles[ attribute ][ ref_attrib_val ] ):
+                            decision_profiles[ attribute ][ ref_attrib_val ][ technique ] = {}
+                        if( attrib_val not in decision_profiles[ attribute ][ ref_attrib_val ][ technique ] ):
+                            decision_profiles[ attribute ][ ref_attrib_val ][ technique ][ attrib_val ] = 0
+                        decision_profiles[ attribute ][ ref_attrib_val ][ technique ][ attrib_val ] += weight
+                    else:
+                        ## TODO - how do we resolve this?
+                        1
+        elif( span in kb ):
+            if( cui not in kb[ span ][ 'norm_counts' ] ):
+                kb[ span ][ 'norm_counts' ][ cui ] = 0
+                kb[ span ][ 'norm_weights' ][ cui ] = 0
+            kb[ span ][ 'norm_counts' ][ cui ] += 1
+            kb[ span ][ 'norm_weights' ][ cui ] += weight
+            kb[ span ][ 'decision_profile' ][ technique ] = {}
+            kb[ span ][ 'decision_profile' ][ technique ][ cui ] = weight
+            if( trainPhase ):
+                if( cui not in census ):
+                    census[ cui ] = 0
+                census[ cui ] += 1
+                ref_cui = kb[ span ][ 'reference_type' ]
+                if( ref_cui in decision_profiles ):
+                    if( technique not in decision_profiles[ ref_cui ] ):
+                        decision_profiles[ ref_cui ][ technique ] = {}
+                    if( cui not in decision_profiles[ ref_cui ][ technique ] ):
+                        decision_profiles[ ref_cui ][ technique ][ cui ] = 0
+                    decision_profiles[ ref_cui ][ technique ][ cui ] += weight
+                else:
+                    ## TODO - how do we resolve this?
+                    1
+        else:
+            ## Try to find any matching spans already registered
+            ## in the kb
+            matched_flag = False
+            for anchor_span in kb:
+                if( end_offset < kb[ anchor_span ][ 'begin_offset' ] ):
+                    ## span ends before the anchor span
+                    continue
+                if( begin_offset > kb[ anchor_span ][ 'end_offset' ] ):
+                    ## span starts after the anchor span
+                    continue
+                ref_cui = kb[ anchor_span ][ 'reference_type' ]
+                if( begin_offset >= kb[ anchor_span ][ 'begin_offset' ] and
+                    end_offset <= kb[ anchor_span ][ 'end_offset' ] ):
+                    ## span is inside the anchor span
+                    weight = weight * partialMatchWeight
+                    if( cui not in kb[ anchor_span ][ 'norm_counts' ] ):
+                        kb[ anchor_span ][ 'norm_counts' ][ cui ] = 0
+                        kb[ anchor_span ][ 'norm_weights' ][ cui ] = 0
+                    kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
+                    kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
+                    kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
+                    kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
+                    if( trainPhase ):
+                        if( cui not in census ):
+                            census[ cui ] = 0
+                        census[ cui ] += 1
+                        if( ref_cui in decision_profiles ):
+                            if( technique not in decision_profiles[ ref_cui ] ):
+                                decision_profiles[ ref_cui ][ technique ] = {}
+                            if( cui not in decision_profiles[ ref_cui ][ technique ] ):
+                                decision_profiles[ ref_cui ][ technique ][ cui ] = 0
+                            decision_profiles[ ref_cui ][ technique ][ cui ] += weight
+                        else:
+                            ## TODO - how do we resolve this?
+                            1
+                    matched_flag = True
+                    break
+                if( begin_offset <= kb[ anchor_span ][ 'begin_offset' ] and
+                    end_offset >= kb[ anchor_span ][ 'end_offset' ] ):
+                    ## span fully contains the anchor span
+                    ## .RRRR.
+                    ## ..SS..
+                    if( cui not in kb[ anchor_span ][ 'norm_counts' ] ):
+                        kb[ anchor_span ][ 'norm_counts' ][ cui ] = 0
+                        kb[ anchor_span ][ 'norm_weights' ][ cui ] = 0
+                    kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
+                    kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
+                    kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
+                    kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
+                    if( trainPhase ):
+                        if( cui not in census ):
+                            census[ cui ] = 0
+                        census[ cui ] += 1
+                        if( ref_cui in decision_profiles ):
+                            if( technique not in decision_profiles[ ref_cui ] ):
+                                decision_profiles[ ref_cui ][ technique ] = {}
+                            if( cui not in decision_profiles[ ref_cui ][ technique ] ):
+                                decision_profiles[ ref_cui ][ technique ][ cui ] = 0
+                            decision_profiles[ ref_cui ][ technique ][ cui ] += weight
+                        else:
+                            ## TODO - how do we resolve this?
+                            1
+                    matched_flag = True
+                elif( begin_offset >= kb[ anchor_span ][ 'begin_offset' ] and
+                      begin_offset < kb[ anchor_span ][ 'end_offset' ] ):
+                    ## span starts inside the anchor span
+                    ## .RRR...
+                    ## ..SSS..
+                    weight = weight * partialMatchWeight
+                    if( cui not in kb[ anchor_span ][ 'norm_counts' ] ):
+                        kb[ anchor_span ][ 'norm_counts' ][ cui ] = 0
+                        kb[ anchor_span ][ 'norm_weights' ][ cui ] = 0
+                    kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
+                    kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
+                    kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
+                    kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
+                    if( trainPhase ):
+                        if( cui not in census ):
+                            census[ cui ] = 0
+                        census[ cui ] += 1
+                        if( ref_cui in decision_profiles ):
+                            if( technique not in decision_profiles[ ref_cui ] ):
+                                decision_profiles[ ref_cui ][ technique ] = {}
+                            if( cui not in decision_profiles[ ref_cui ][ technique ] ):
+                                decision_profiles[ ref_cui ][ technique ][ cui ] = 0
+                            decision_profiles[ ref_cui ][ technique ][ cui ] += weight
+                        else:
+                            ## TODO - how do we resolve this?
+                            1
+                    matched_flag = True
+                elif( end_offset > kb[ anchor_span ][ 'begin_offset' ] and
+                      end_offset <= kb[ anchor_span ][ 'end_offset' ] ):
+                    ## span ends inside the anchor span
+                    ## ...RRR.
+                    ## ..SSS..
+                    weight = weight * partialMatchWeight
+                    if( cui not in kb[ anchor_span ][ 'norm_counts' ] ):
+                        kb[ anchor_span ][ 'norm_counts' ][ cui ] = 0
+                        kb[ anchor_span ][ 'norm_weights' ][ cui ] = 0
+                    kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
+                    kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
+                    kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
+                    kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
+                    if( trainPhase ):
+                        if( cui not in census ):
+                            census[ cui ] = 0
+                        census[ cui ] += 1
+                        if( ref_cui in decision_profiles ):
+                            if( technique not in decision_profiles[ ref_cui ] ):
+                                decision_profiles[ ref_cui ][ technique ] = {}
+                            if( cui not in decision_profiles[ ref_cui ][ technique ] ):
+                                decision_profiles[ ref_cui ][ technique ][ cui ] = 0
+                            decision_profiles[ ref_cui ][ technique ][ cui ] += weight
+                        else:
+                            ## TODO - how do we resolve this?
+                            1
+                    matched_flag = True
+                else:
+                    ## How did we get here?
+                    log.error( 'Somehow span {} and reference span {} are neither a match nor mismatch in file \'{}\''.format( span ,
+                                                                                                                               anchor_span ,
+                                                                                                                               filename ) )
+            ####
+            ## If we never matched another pre-existing span, then
+            ## add a new anchor span to the kb
+            if( not matched_flag and votingUnit == 'span' ):
+                if( trainPhase ):
+                    ## add to negative counts
+                    census[ 'NONE' ] += 1
+                    if( technique not in decision_profiles[ 'NONE' ] ):
+                        decision_profiles[ 'NONE' ][ technique ] = {}
+                    ## TODO - should this cui value be set to NONE as well?
+                    if( cui not in decision_profiles[ 'NONE' ][ technique ] ):
+                        decision_profiles[ 'NONE' ][ technique ][ cui ] = 0
+                    decision_profiles[ 'NONE' ][ technique ][ cui ] += weight
+                else:
+                    kb[ span ] = {}
+                    kb[ span ][ 'begin_offset' ] = begin_offset
+                    kb[ span ][ 'end_offset' ] = end_offset
+                    kb[ span ][ 'norm_counts' ] = {}
+                    kb[ span ][ 'norm_weights' ] = {}
+                    kb[ span ][ 'norm_counts' ][ cui ] = 1
+                    kb[ span ][ 'norm_weights' ][ cui ] = weight
+                    kb[ span ][ 'decision_profile' ] = {}
+                    kb[ span ][ 'decision_profile' ][ technique ] = {}
+                    kb[ span ][ 'decision_profile' ][ technique ][ cui ] = weight
+    ########
+    return( census , decision_profiles , kb )
+
+    
 def main( args , classifiers ):
+    eventMention_typeString = 'org.apache.ctakes.typesystem.type.textsem.EventMention'
+    modifier_typeString = 'org.apache.ctakes.typesystem.type.textsem.Modifier'
+    timeMention_typeString = 'org.apache.ctakes.typesystem.type.textsem.TimeMention'
     ############################
     trainPhase = False
     if( args.phase == 'train' ):
@@ -215,9 +486,6 @@ def main( args , classifiers ):
                 ## our workbench a little cleaner
                 ##else:
                 ##    1
-            eventMention_typeString = 'org.apache.ctakes.typesystem.type.textsem.EventMention'
-            modifier_typeString = 'org.apache.ctakes.typesystem.type.textsem.Modifier'
-            timeMention_typeString = 'org.apache.ctakes.typesystem.type.textsem.TimeMention'
             for annotationTypeString in [ 'textsem.IdentifiedAnnotation' ,
                                           eventMention_typeString ,
                                           modifier_typeString ,
@@ -315,258 +583,25 @@ def main( args , classifiers ):
                     else:
                         kb[ concept ][ attribute ][ 'decision_profile' ][ technique ] = {}
                         kb[ concept ][ attribute ][ 'decision_profile' ][ technique ][ attrib_val ] = weight
-
-        ## Grab all...
-        for annot in cas.select( 'textsem.IdentifiedAnnotation' ):
-            technique = annot.discoveryTechnique
-            if( technique == '0' or
-                technique not in classifiers or
-                ## We already took care of the top_classifier above
-                ## for span-based voting during the testing phase
-                ( not trainPhase and args.votingUnit == 'span' and technique == top_classifier_id ) ):
-                continue
-            ## TODO - refactor variable named 'cui' to reflect
-            ##        more fluid use across annotation types
-            if( args.votingUnit == 'sentence' ):
-                cui = 'section'
-            elif( args.votingUnit == 'span' ):
-                try:
-                    concept_id = int( annot.ontologyConceptArray )
-                    cui = xmiId2cui[ concept_id ]
-                except TypeError as e:
-                    ## A TypeError here means occurs when
-                    ## ontologyConceptArray is not defined, meaning
-                    ## that there is no associated CUI
-                    cui = 'span'
-            elif( args.votingUnit == 'doc' ):
-                ## TODO - refactor how we extract the concept name
-                ##        when this is ported to use real CUIs
-                concept = annot.ontologyConceptArray
-            ################
-            begin_offset = annot.begin
-            end_offset = annot.end
-            span = '{}-{}'.format( begin_offset , end_offset )
-            if( args.weighting == 'ranked' ):
-                weight = 1 / int( technique )
-            else:
-                weight = 1
-            ######################################################
-            if( args.votingUnit == 'doc' ):
-                if( concept not in kb ):
-                    kb[ concept ] = {}
-                ####
-                attribute_values = {}
-                if( 'polarity' in attribute_list ):
-                    attribute_values[ 'polarity' ] = annot.polarity
-                else:
-                    attribute_values[ 'polarity' ] = '0'
-                ####
-                if( 'uncertainty' in attribute_list ):
-                    attribute_values[ 'uncertainty' ] = annot.uncertainty
-                else:
-                    attribute_values[ 'uncertainty' ] = '0'
-                ####
-                for attribute in attribute_list:
-                    attrib_val = attribute_values[ attribute ]
-                    ##
-                    if( attribute not in kb[ concept ] ):
-                        kb[ concept ][ attribute ] = {}
-                        ## We treat underspecified attributes as zero
-                        kb[ concept ][ attribute ][ 'reference_type' ] = '0'
-                        kb[ concept ][ attribute ][ 'decision_profile' ] = {}
-                    kb[ concept ][ attribute ][ 'decision_profile' ][ technique ] = {}
-                    kb[ concept ][ attribute ][ 'decision_profile' ][ technique ][ attrib_val ] = weight
-                    ## During training, increment the global frequency of
-                    ## attributes and values
-                    if( trainPhase ):
-                        if( attribute not in census ):
-                            census[ attribute ] = {}
-                        if( attrib_val not in census[ attribute ] ):
-                            census[ attribute ][ attrib_val ] = 0
-                        census[ attribute ][ attrib_val ] += 1
-                        ref_attrib_val = kb[ concept ][ attribute ][ 'reference_type' ]
-                        if( attribute in decision_profiles ):
-                            if( ref_attrib_val not in decision_profiles[ attribute ] ):
-                                ## Is this even possible?
-                                decision_profiles[ attribute ][ ref_attrib_val ] = {}
-                            ##
-                            if( technique not in decision_profiles[ attribute ][ ref_attrib_val ] ):
-                                decision_profiles[ attribute ][ ref_attrib_val ][ technique ] = {}
-                            if( attrib_val not in decision_profiles[ attribute ][ ref_attrib_val ][ technique ] ):
-                                decision_profiles[ attribute ][ ref_attrib_val ][ technique ][ attrib_val ] = 0
-                            decision_profiles[ attribute ][ ref_attrib_val ][ technique ][ attrib_val ] += weight
-                        else:
-                            ## TODO - how do we resolve this?
-                            1
-            elif( span in kb ):
-                if( cui not in kb[ span ][ 'norm_counts' ] ):
-                    kb[ span ][ 'norm_counts' ][ cui ] = 0
-                    kb[ span ][ 'norm_weights' ][ cui ] = 0
-                kb[ span ][ 'norm_counts' ][ cui ] += 1
-                kb[ span ][ 'norm_weights' ][ cui ] += weight
-                kb[ span ][ 'decision_profile' ][ technique ] = {}
-                kb[ span ][ 'decision_profile' ][ technique ][ cui ] = weight
-                if( trainPhase ):
-                    if( cui not in census ):
-                        census[ cui ] = 0
-                    census[ cui ] += 1
-                    ref_cui = kb[ span ][ 'reference_type' ]
-                    if( ref_cui in decision_profiles ):
-                        if( technique not in decision_profiles[ ref_cui ] ):
-                            decision_profiles[ ref_cui ][ technique ] = {}
-                        if( cui not in decision_profiles[ ref_cui ][ technique ] ):
-                            decision_profiles[ ref_cui ][ technique ][ cui ] = 0
-                        decision_profiles[ ref_cui ][ technique ][ cui ] += weight
-                    else:
-                        ## TODO - how do we resolve this?
-                        1
-            else:
-                ## Try to find any matching spans already registered
-                ## in the kb
-                matched_flag = False
-                for anchor_span in kb:
-                    if( end_offset < kb[ anchor_span ][ 'begin_offset' ] ):
-                        ## span ends before the anchor span
-                        continue
-                    if( begin_offset > kb[ anchor_span ][ 'end_offset' ] ):
-                        ## span starts after the anchor span
-                        continue
-                    ref_cui = kb[ anchor_span ][ 'reference_type' ]
-                    if( begin_offset >= kb[ anchor_span ][ 'begin_offset' ] and
-                        end_offset <= kb[ anchor_span ][ 'end_offset' ] ):
-                        ## span is inside the anchor span
-                        weight = weight * args.partialMatchWeight
-                        if( cui not in kb[ anchor_span ][ 'norm_counts' ] ):
-                            kb[ anchor_span ][ 'norm_counts' ][ cui ] = 0
-                            kb[ anchor_span ][ 'norm_weights' ][ cui ] = 0
-                        kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
-                        kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
-                        kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
-                        kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
-                        if( trainPhase ):
-                            if( cui not in census ):
-                                census[ cui ] = 0
-                            census[ cui ] += 1
-                            if( ref_cui in decision_profiles ):
-                                if( technique not in decision_profiles[ ref_cui ] ):
-                                    decision_profiles[ ref_cui ][ technique ] = {}
-                                if( cui not in decision_profiles[ ref_cui ][ technique ] ):
-                                    decision_profiles[ ref_cui ][ technique ][ cui ] = 0
-                                decision_profiles[ ref_cui ][ technique ][ cui ] += weight
-                            else:
-                                ## TODO - how do we resolve this?
-                                1
-                        matched_flag = True
-                        break
-                    if( begin_offset <= kb[ anchor_span ][ 'begin_offset' ] and
-                        end_offset >= kb[ anchor_span ][ 'end_offset' ] ):
-                        ## span fully contains the anchor span
-                        ## .RRRR.
-                        ## ..SS..
-                        if( cui not in kb[ anchor_span ][ 'norm_counts' ] ):
-                            kb[ anchor_span ][ 'norm_counts' ][ cui ] = 0
-                            kb[ anchor_span ][ 'norm_weights' ][ cui ] = 0
-                        kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
-                        kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
-                        kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
-                        kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
-                        if( trainPhase ):
-                            if( cui not in census ):
-                                census[ cui ] = 0
-                            census[ cui ] += 1
-                            if( ref_cui in decision_profiles ):
-                                if( technique not in decision_profiles[ ref_cui ] ):
-                                    decision_profiles[ ref_cui ][ technique ] = {}
-                                if( cui not in decision_profiles[ ref_cui ][ technique ] ):
-                                    decision_profiles[ ref_cui ][ technique ][ cui ] = 0
-                                decision_profiles[ ref_cui ][ technique ][ cui ] += weight
-                            else:
-                                ## TODO - how do we resolve this?
-                                1
-                        matched_flag = True
-                    elif( begin_offset >= kb[ anchor_span ][ 'begin_offset' ] and
-                          begin_offset < kb[ anchor_span ][ 'end_offset' ] ):
-                        ## span starts inside the anchor span
-                        ## .RRR...
-                        ## ..SSS..
-                        weight = weight * args.partialMatchWeight
-                        if( cui not in kb[ anchor_span ][ 'norm_counts' ] ):
-                            kb[ anchor_span ][ 'norm_counts' ][ cui ] = 0
-                            kb[ anchor_span ][ 'norm_weights' ][ cui ] = 0
-                        kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
-                        kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
-                        kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
-                        kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
-                        if( trainPhase ):
-                            if( cui not in census ):
-                                census[ cui ] = 0
-                            census[ cui ] += 1
-                            if( ref_cui in decision_profiles ):
-                                if( technique not in decision_profiles[ ref_cui ] ):
-                                    decision_profiles[ ref_cui ][ technique ] = {}
-                                if( cui not in decision_profiles[ ref_cui ][ technique ] ):
-                                    decision_profiles[ ref_cui ][ technique ][ cui ] = 0
-                                decision_profiles[ ref_cui ][ technique ][ cui ] += weight
-                            else:
-                                ## TODO - how do we resolve this?
-                                1
-                        matched_flag = True
-                    elif( end_offset > kb[ anchor_span ][ 'begin_offset' ] and
-                          end_offset <= kb[ anchor_span ][ 'end_offset' ] ):
-                        ## span ends inside the anchor span
-                        ## ...RRR.
-                        ## ..SSS..
-                        weight = weight * args.partialMatchWeight
-                        if( cui not in kb[ anchor_span ][ 'norm_counts' ] ):
-                            kb[ anchor_span ][ 'norm_counts' ][ cui ] = 0
-                            kb[ anchor_span ][ 'norm_weights' ][ cui ] = 0
-                        kb[ anchor_span ][ 'norm_counts' ][ cui ] += 1
-                        kb[ anchor_span ][ 'norm_weights' ][ cui ] += weight
-                        kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
-                        kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
-                        if( trainPhase ):
-                            if( cui not in census ):
-                                census[ cui ] = 0
-                            census[ cui ] += 1
-                            if( ref_cui in decision_profiles ):
-                                if( technique not in decision_profiles[ ref_cui ] ):
-                                    decision_profiles[ ref_cui ][ technique ] = {}
-                                if( cui not in decision_profiles[ ref_cui ][ technique ] ):
-                                    decision_profiles[ ref_cui ][ technique ][ cui ] = 0
-                                decision_profiles[ ref_cui ][ technique ][ cui ] += weight
-                            else:
-                                ## TODO - how do we resolve this?
-                                1
-                        matched_flag = True
-                    else:
-                        ## How did we get here?
-                        log.error( 'Somehow span {} and reference span {} are neither a match nor mismatch in file \'{}\''.format( span ,
-                                                                                                                                   anchor_span ,
-                                                                                                                                   filename ) )
-                ####
-                ## If we never matched another pre-existing span, then
-                ## add a new anchor span to the kb
-                if( not matched_flag and args.votingUnit == 'span' ):
-                    if( trainPhase ):
-                        ## add to negative counts
-                        census[ 'NONE' ] += 1
-                        if( technique not in decision_profiles[ 'NONE' ] ):
-                            decision_profiles[ 'NONE' ][ technique ] = {}
-                        ## TODO - should this cui value be set to NONE as well?
-                        if( cui not in decision_profiles[ 'NONE' ][ technique ] ):
-                            decision_profiles[ 'NONE' ][ technique ][ cui ] = 0
-                        decision_profiles[ 'NONE' ][ technique ][ cui ] += weight
-                    else:
-                        kb[ span ] = {}
-                        kb[ span ][ 'begin_offset' ] = begin_offset
-                        kb[ span ][ 'end_offset' ] = end_offset
-                        kb[ span ][ 'norm_counts' ] = {}
-                        kb[ span ][ 'norm_weights' ] = {}
-                        kb[ span ][ 'norm_counts' ][ cui ] = 1
-                        kb[ span ][ 'norm_weights' ][ cui ] = weight
-                        kb[ span ][ 'decision_profile' ] = {}
-                        kb[ span ][ 'decision_profile' ][ technique ] = {}
-                        kb[ span ][ 'decision_profile' ][ technique ][ cui ] = weight
+        ########
+        ## Grab all the remaining annotations of interest and process them
+        for annotationTypeString in [ 'textsem.IdentifiedAnnotation' ,
+                                      eventMention_typeString ,
+                                      modifier_typeString ,
+                                      timeMention_typeString ]:
+            census , decision_profiles , kb = processRemainingAnnotations( cas ,
+                                                                           filename ,
+                                                                           census ,
+                                                                           decision_profiles ,
+                                                                           kb ,
+                                                                           xmiId2cui ,
+                                                                           annotationTypeString ,
+                                                                           trainPhase ,
+                                                                           classifiers ,
+                                                                           top_classifier_id ,
+                                                                           args.votingUnit ,
+                                                                           args.weighting ,
+                                                                           args.partialMatchWeight )
         #########
         ## TODO - should I run this after aggregating decision profiles data structure
         ##        so we can generate outputs even for training on the same run? Maybe
