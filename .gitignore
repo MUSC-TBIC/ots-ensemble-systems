@@ -4,6 +4,7 @@
 # shouldn't be distributed via git
 
 data/
+models/
 
 # ############################
 # temporary and editor files

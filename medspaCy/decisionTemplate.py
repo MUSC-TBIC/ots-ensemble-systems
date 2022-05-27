@@ -15,8 +15,11 @@ import pickle
 
 from libTypeSystem import loadTypeSystem
 from libTypeSystem import metadata_typeString, umlsConcept_typeString
+from libTypeSystem import eventMention_typeString, modifier_typeString, timeMention_typeString
+
 from libEnsemble import cosineSpannedVotes, cosineDocVotes
 
+    
 ## Grab all the CUIs and their xmi:id's
 def extractCuiMap( cas ):
     xmiId2cui = {}
@@ -376,15 +379,24 @@ def processRemainingAnnotations( cas ,
 
     
 def main( args , classifiers ):
-    eventMention_typeString = 'org.apache.ctakes.typesystem.type.textsem.EventMention'
-    modifier_typeString = 'org.apache.ctakes.typesystem.type.textsem.Modifier'
-    timeMention_typeString = 'org.apache.ctakes.typesystem.type.textsem.TimeMention'
     ############################
     trainPhase = False
     if( args.phase == 'train' ):
         trainPhase = True
     ############################
-    typesystem , NoteNlp = loadTypeSystem( args.typesDir )
+    typesystem , NoteNlp = loadTypeSystem( typesDir = args.typesDir ,
+                                           typesFile = args.typesFile )
+    annotation_types = []
+    for type_string in [ 'textsem.IdentifiedAnnotation' ,
+                         eventMention_typeString ,
+                         modifier_typeString ,
+                         timeMention_typeString ]:
+        try:
+            typesystem.get_type( type_string )
+        except:
+            log.debug( 'Annotation type skipped because it is not present in the type system: {}'.format( type_string ) )
+        else:
+            annotation_types.append( type_string )
     ############################
     ## Seed the list of files to process either directly from the
     ## input directory or from the contents of --file-list
@@ -522,10 +534,7 @@ def main( args , classifiers ):
                 ## our workbench a little cleaner
                 ##else:
                 ##    1
-            for annotationTypeString in [ 'textsem.IdentifiedAnnotation' ,
-                                          eventMention_typeString ,
-                                          modifier_typeString ,
-                                          timeMention_typeString ]:
+            for annotationTypeString in annotation_types:
                 census , decision_profiles , kb = seedSpansInKb( cas ,
                                                                  census ,
                                                                  decision_profiles ,
@@ -621,10 +630,7 @@ def main( args , classifiers ):
                         kb[ concept ][ attribute ][ 'decision_profile' ][ technique ][ attrib_val ] = weight
         ########
         ## Grab all the remaining annotations of interest and process them
-        for annotationTypeString in [ 'textsem.IdentifiedAnnotation' ,
-                                      eventMention_typeString ,
-                                      modifier_typeString ,
-                                      timeMention_typeString ]:
+        for annotationTypeString in annotation_types:
             census , decision_profiles , kb = processRemainingAnnotations( cas ,
                                                                            filename ,
                                                                            census ,
@@ -716,9 +722,12 @@ if __name__ == '__main__':
     parser.add_argument( '--partial-match-weight' ,
                          default = 1 ,
                          dest = 'partialMatchWeight' )
-    parser.add_argument( '--types-dir' ,
+    parser.add_argument( '--types-dir' , default = None ,
                          dest = 'typesDir' ,
                          help = 'Directory containing the systems files need to be loaded' )
+    parser.add_argument( '--types-file' , default = None ,
+                         dest = 'typesFile' ,
+                         help = 'File containing the base type system definition need to be loaded' )
     parser.add_argument( '--input-dir' ,
                          required = True ,
                          dest = 'inputDir' ,
