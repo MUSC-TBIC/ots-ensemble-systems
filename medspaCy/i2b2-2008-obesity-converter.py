@@ -9,6 +9,8 @@ import spacy
 import medspacy
 import cassis
 
+from libTypeSystem import metadata_typeString, umlsConcept_typeString
+
 from lxml import etree as ET
 
 def main( args ):
@@ -35,7 +37,7 @@ def main( args ):
     ############
     ## ... for Metadata
     ## TODO - this parent and supertype should probably be something else
-    NoteMetadata = typesystem.create_type( name = 'refsem.Metadata' ,
+    NoteMetadata = typesystem.create_type( name = metadata_typeString ,
                                            supertypeName = 'uima.tcas.Annotation' )
     ## TODO - how to represent pairs, as per the reference standard?
     typesystem.add_feature( type_ = NoteMetadata ,
@@ -44,7 +46,7 @@ def main( args ):
                             rangeTypeName = 'uima.cas.String' )
     ############
     ## ... for UmlsConcept
-    UmlsConcept = typesystem.create_type( name = 'refsem.UmlsConcept' ,
+    UmlsConcept = typesystem.create_type( name = umlsConcept_typeString ,
                                           supertypeName = 'uima.tcas.Annotation' )
     typesystem.add_feature( type_ = UmlsConcept ,
                             name = 'tui' ,

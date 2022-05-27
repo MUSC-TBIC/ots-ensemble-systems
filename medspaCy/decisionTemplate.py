@@ -14,6 +14,7 @@ import cassis
 import pickle
 
 from libTypeSystem import loadTypeSystem
+from libTypeSystem import metadata_typeString, umlsConcept_typeString
 from libEnsemble import cosineSpannedVotes, cosineDocVotes
 
 
@@ -412,7 +413,7 @@ def main( args , classifiers ):
             cas = cassis.load_cas_from_xmi( fp ,
                                             typesystem = typesystem )
         ## Grab the discoveryTechnique long names
-        for metadata in cas.select( 'refsem.Metadata' ):
+        for metadata in cas.select( metadata_typeString ):
             classifier_name , classifier_id = metadata.other.split( '=' )
             if( classifier_id == '0' or
                 classifier_id not in classifiers ):
