@@ -17,6 +17,15 @@ from libTypeSystem import loadTypeSystem
 from libTypeSystem import metadata_typeString, umlsConcept_typeString
 from libEnsemble import cosineSpannedVotes, cosineDocVotes
 
+## Grab all the CUIs and their xmi:id's
+def extractCuiMap( cas ):
+    xmiId2cui = {}
+    for umls_concept in cas.select( umlsConcept_typeString ):
+        xmi_id = umls_concept.xmiID
+        cui = umls_concept.cui
+        xmiId2cui[ xmi_id ] = cui
+    return( xmiId2cui )
+
 
 def seedSpansInKb( cas ,
                    census ,
@@ -421,10 +430,7 @@ def main( args , classifiers ):
             classifier2id[ classifier_name ] = classifier_id
             id2classifier[ classifier_id ] = classifier_name
         ## Grab all the CUIs and their xmi:id's
-        for umls_concept in cas.select( 'refsem.UmlsConcept' ):
-            xmi_id = umls_concept.xmiID
-            cui = umls_concept.cui
-            xmiId2cui[ xmi_id ] = cui
+        xmiId2cui = extractCuiMap( cas )
         ## For sentence-based annotations, we want to seed the kb with
         ## all the spans of the sentences
         kb = {}

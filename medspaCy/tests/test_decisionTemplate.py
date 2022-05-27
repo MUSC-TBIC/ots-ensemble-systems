@@ -1,20 +1,25 @@
 
+import pytest
+
+import os
 import json
 
 import cassis
 
 import decisionTemplate
 from libTypeSystem import loadTypeSystem
+from libTypeSystem import umlsConcept_typeString
+from libTypeSystem import identifiedAnnotation_typeString, eventMention_typeString
 
 
-identifiedAnnotation_typeString = 'textsem.IdentifiedAnnotation'
-eventMention_typeString = 'org.apache.ctakes.typesystem.type.textsem.EventMention'
-modifier_typeString = 'org.apache.ctakes.typesystem.type.textsem.Modifier'
-timeMention_typeString = 'org.apache.ctakes.typesystem.type.textsem.TimeMention'
-
-
-def loadCasXmi( cas_xmi_file = 'tests/data/three-classifier-demo.xmi' ):
-    typesystem , _ = loadTypeSystem( typesDir = '../types' )
+def loadCasXmi( cas_xmi_file = 'tests/data/three-classifier-demo.xmi' ,
+                typesFile = None ):
+    if( typesFile is None ):
+        typesystem , _ = loadTypeSystem( typesDir = '../types' )
+    else:
+        typesystem , _ = loadTypeSystem( typesDir = None ,
+                                         typesFile = typesFile )
+    ########
     with open( cas_xmi_file , 'rb' ) as fp:
         cas = cassis.load_cas_from_xmi( fp ,
                                         typesystem = typesystem )
@@ -31,6 +36,42 @@ def saveJSON( json_data , json_file ):
     with open( json_file , 'w' ) as fp:
         json.dump( json_data , fp , indent = 4 )
 
+
+def test_load_asthma_cui_map():
+    cas = loadCasXmi()
+    xmiId2cui = decisionTemplate.extractCuiMap( cas )
+    assert xmiId2cui == { 10 : "Asthma" ,
+                          11 : "CAD" ,
+                          12 : "GERD" }
+
+
+@pytest.mark.filterwarnings("ignore:Feature")
+def test_load_sdoh_cui_map():
+    if( not os.path.exists( '/Users/pmh/bin/apache-ctakes-4.0.0.1/resources/org/apache/ctakes/typesystem/types/TypeSystem.xml' ) ):
+        pytest.skip( 'Skipping because full SHARPn type system file not found' )
+    ########
+    cas = loadCasXmi( cas_xmi_file = 'tests/data/sharpn-ref/living-and-smoking.xmi' ,
+                      typesFile = '/Users/pmh/bin/apache-ctakes-4.0.0.1/resources/org/apache/ctakes/typesystem/types/TypeSystem.xml' )
+    xmiId2cui = decisionTemplate.extractCuiMap( cas )
+    assert xmiId2cui == { 2  : 'C2184149' ,
+                          3  : 'C0439044' ,
+                          4  : 'C0557130' ,
+                          5  : 'C3242657' ,
+                          6  : 'C0237154' ,
+                          7  : 'C0242271' ,
+                          8  : 'C0557351' ,
+                          9  : 'C0041674' ,
+                          10 : "C0035345" ,
+                          11 : "C0682148" ,
+                          12 : "C0038492" ,
+                          13 : 'C0555052' ,
+                          14 : 'C0001948' ,
+                          15 : 'C0281875' ,
+                          16 : 'C1287520' ,
+                          17 : 'C1971295' ,
+                          18 : 'C1698618' ,
+                          19 : 'C3853727' }
+    
 
 def test_simple_fill():
     cas = loadCasXmi()
