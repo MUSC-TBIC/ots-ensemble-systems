@@ -400,3 +400,75 @@ def test_process_annots_for_partial_weights_run():
     ref_kb = loadJSON( 'tests/data/three-classifier-demo-kbRun-classifier-1-partial-weight.json' )
     assert kb == ref_kb
 
+
+@pytest.mark.filterwarnings("ignore:Feature")
+def test_simple_fill_with_event_mentions():
+    if( not os.path.exists( '/Users/pmh/bin/apache-ctakes-4.0.0.1/resources/org/apache/ctakes/typesystem/types/TypeSystem.xml' ) ):
+        pytest.skip( 'Skipping because full SHARPn type system file not found' )
+    ########
+    cas = loadCasXmi( cas_xmi_file = 'tests/data/sharpn-out/living-and-smoking.xmi' ,
+                      typesFile = '/Users/pmh/bin/apache-ctakes-4.0.0.1/resources/org/apache/ctakes/typesystem/types/TypeSystem.xml' )
+    xmiId2cui = decisionTemplate.extractCuiMap( cas )
+    census = { 'NONE' : 0 }
+    decision_profiles = { 'NONE' : {} }
+    kb = {}
+    census , decision_profiles , kb = decisionTemplate.seedSpansInKb( cas ,
+                                                                      census ,
+                                                                      decision_profiles ,
+                                                                      kb ,
+                                                                      xmiId2cui ,
+                                                                      eventMention_typeString ,
+                                                                      trainPhase = True ,
+                                                                      top_classifier_id = '1' ,
+                                                                      weighting = 'ranked' )
+    assert census == { "NONE": 0,
+                       "C2184149": 0,
+                       "C1287520": 0
+                      }
+    assert decision_profiles == { "NONE": {},
+                                  "C2184149": {},
+                                  "C1287520": {}
+                                 }
+
+
+@pytest.mark.filterwarnings("ignore:Feature")
+def test_simple_run_with_event_mentions():
+    if( not os.path.exists( '/Users/pmh/bin/apache-ctakes-4.0.0.1/resources/org/apache/ctakes/typesystem/types/TypeSystem.xml' ) ):
+        pytest.skip( 'Skipping because full SHARPn type system file not found' )
+    ########
+    cas = loadCasXmi( cas_xmi_file = 'tests/data/sharpn-out/living-and-smoking.xmi' ,
+                      typesFile = '/Users/pmh/bin/apache-ctakes-4.0.0.1/resources/org/apache/ctakes/typesystem/types/TypeSystem.xml' )
+    xmiId2cui = decisionTemplate.extractCuiMap( cas )
+    census = { 'NONE' : 0 }
+    decision_profiles = { 'NONE' : {} }
+    kb = {}
+    census , decision_profiles , kb = decisionTemplate.seedSpansInKb( cas ,
+                                                                      census ,
+                                                                      decision_profiles ,
+                                                                      kb ,
+                                                                      xmiId2cui ,
+                                                                      eventMention_typeString ,
+                                                                      trainPhase = True ,
+                                                                      top_classifier_id = '1' ,
+                                                                      weighting = 'ranked' )
+    census , decision_profiles , kb = decisionTemplate.processRemainingAnnotations( cas ,
+                                                                                    'living-and-smoking.xmi' ,
+                                                                                    census ,
+                                                                                    decision_profiles ,
+                                                                                    kb ,
+                                                                                    xmiId2cui ,
+                                                                                    eventMention_typeString ,
+                                                                                    trainPhase = True ,
+                                                                                    classifiers = [ '1' , '2' ] ,
+                                                                                    top_classifier_id = '1' ,
+                                                                                    votingUnit = 'span' ,
+                                                                                    weighting = 'ranked' ,
+                                                                                    partialMatchWeight = 1.0 )
+    assert census == { "NONE": 0,
+                       "C2184149": 1 ,
+                       "C1287520": 2
+                      }
+    ref_decision_profiles = loadJSON( 'tests/data/sharpn-out/decision_profiles.json' )
+    assert decision_profiles == ref_decision_profiles
+    ref_kb = loadJSON( 'tests/data/sharpn-out/kb.json' )
+    assert kb == ref_kb

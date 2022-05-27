@@ -17,7 +17,7 @@ from libTypeSystem import relationArgument_typeString, binaryTextRelation_typeSt
 
 def main( args ):
     teams = [ os.path.basename( f ) for f in glob.glob( os.path.join( args.inputSysDir ,
-                                                                      '*.xmi' ) ) ]
+                                                                      '*' ) ) ]
     for team in sorted( teams ):
         print( '{}'.format( team ) )
 

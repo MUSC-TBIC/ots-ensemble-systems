@@ -52,8 +52,23 @@ def seedSpansInKb( cas ,
         kb[ span ][ 'norm_weights' ] = {}
         kb[ span ][ 'decision_profile' ] = {}
         try:
+            ## ontologyConceptArray seems to always be an int
             concept_id = int( annot.ontologyConceptArray )
             cui = xmiId2cui[ concept_id ]
+        except AttributeError as e:
+            ## ontologyConceptArr seems to always be a list
+            if( type( [] ) == type( annot.ontologyConceptArr ) ):
+                ontology_concept = annot.ontologyConceptArr[ 0 ]
+                ## Because this concept is the rich representation, we
+                ## can just directly get the CUI.  It is equivalent to
+                ## using the follow two-step approach:
+                ## concept_id = ontology_concept.get( 'xmiID' )
+                ## cui = xmiId2cui[ concept_id ]
+                cui = ontology_concept.get( 'cui' )
+            else:
+                ## Bailing because we can't figure out how to unpack
+                ## the CUIs
+                cui = 'span'
         except TypeError as e:
             ## A TypeError here means occurs when
             ## ontologyConceptArray is not defined, meaning
@@ -108,6 +123,20 @@ def processRemainingAnnotations( cas ,
             try:
                 concept_id = int( annot.ontologyConceptArray )
                 cui = xmiId2cui[ concept_id ]
+            except AttributeError as e:
+                ## ontologyConceptArr seems to always be a list
+                if( type( [] ) == type( annot.ontologyConceptArr ) ):
+                    ontology_concept = annot.ontologyConceptArr[ 0 ]
+                    ## Because this concept is the rich representation, we
+                    ## can just directly get the CUI.  It is equivalent to
+                    ## using the follow two-step approach:
+                    ## concept_id = ontology_concept.get( 'xmiID' )
+                    ## cui = xmiId2cui[ concept_id ]
+                    cui = ontology_concept.get( 'cui' )
+                else:
+                    ## Bailing because we can't figure out how to unpack
+                    ## the CUIs
+                    cui = 'span'
             except TypeError as e:
                 ## A TypeError here means occurs when
                 ## ontologyConceptArray is not defined, meaning
