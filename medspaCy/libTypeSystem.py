@@ -12,16 +12,24 @@ import medspacy
 import cassis
 
 import warnings
-
 warnings.filterwarnings( 'ignore' , category = UserWarning , module = 'cassis' )
+
+
+metadata_typeString = 'org.apache.ctakes.typesystem.type.structured.Metadata'
+umlsConcept_typeString = 'org.apache.ctakes.typesystem.type.refsem.UmlsConcept'
 
 identifiedAnnotation_typeString = 'textsem.IdentifiedAnnotation'
 eventMention_typeString = 'org.apache.ctakes.typesystem.type.textsem.EventMention'
 modifier_typeString = 'org.apache.ctakes.typesystem.type.textsem.Modifier'
 timeMention_typeString = 'org.apache.ctakes.typesystem.type.textsem.TimeMention'
 
-metadata_typeString = 'org.apache.ctakes.typesystem.type.structured.Metadata'
-umlsConcept_typeString = 'org.apache.ctakes.typesystem.type.refsem.UmlsConcept'
+event_typeString = 'org.apache.ctakes.typesystem.type.refsem.Event'
+eventProperties_typeString = 'org.apache.ctakes.typesystem.type.refsem.EventProperties'
+attribute_typeString = 'org.apache.ctakes.typesystem.type.refsem.Attribute'
+
+relationArgument_typeString = 'org.apache.ctakes.typesystem.type.relation.RelationArgument'
+binaryTextRelation_typeString = 'org.apache.ctakes.typesystem.type.relation.BinaryTextRelation'
+
 
 def loadTypeSystem( typesDir , typesFile = None ):
     ############################
