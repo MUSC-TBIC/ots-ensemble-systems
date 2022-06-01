@@ -59,19 +59,24 @@ def seedSpansInKb( cas ,
             concept_id = int( annot.ontologyConceptArray )
             cui = xmiId2cui[ concept_id ]
         except AttributeError as e:
-            ## ontologyConceptArr seems to always be a list
-            if( type( [] ) == type( annot.ontologyConceptArr ) ):
-                ontology_concept = annot.ontologyConceptArr[ 0 ]
-                ## Because this concept is the rich representation, we
-                ## can just directly get the CUI.  It is equivalent to
-                ## using the follow two-step approach:
-                ## concept_id = ontology_concept.get( 'xmiID' )
-                ## cui = xmiId2cui[ concept_id ]
-                cui = ontology_concept.get( 'cui' )
-            else:
-                ## Bailing because we can't figure out how to unpack
-                ## the CUIs
-                cui = 'span'
+            if( annotationTypeString.endswith( 'EventMention' ) ):
+                ## ontologyConceptArr seems to always be a list
+                if( type( [] ) == type( annot.ontologyConceptArr ) ):
+                    ontology_concept = annot.ontologyConceptArr[ 0 ]
+                    ## Because this concept is the rich representation, we
+                    ## can just directly get the CUI.  It is equivalent to
+                    ## using the follow two-step approach:
+                    ## concept_id = ontology_concept.get( 'xmiID' )
+                    ## cui = xmiId2cui[ concept_id ]
+                    cui = ontology_concept.get( 'cui' )
+                else:
+                    ## Bailing because we can't figure out how to unpack
+                    ## the CUIs
+                    cui = 'span'
+            elif( annotationTypeString.endswith( 'Modifier' ) ):
+                cui = annot.category
+                if( cui is None ):
+                    cui = 'span'
         except TypeError as e:
             ## A TypeError here means occurs when
             ## ontologyConceptArray is not defined, meaning
@@ -127,19 +132,24 @@ def processRemainingAnnotations( cas ,
                 concept_id = int( annot.ontologyConceptArray )
                 cui = xmiId2cui[ concept_id ]
             except AttributeError as e:
-                ## ontologyConceptArr seems to always be a list
-                if( type( [] ) == type( annot.ontologyConceptArr ) ):
-                    ontology_concept = annot.ontologyConceptArr[ 0 ]
-                    ## Because this concept is the rich representation, we
-                    ## can just directly get the CUI.  It is equivalent to
-                    ## using the follow two-step approach:
-                    ## concept_id = ontology_concept.get( 'xmiID' )
-                    ## cui = xmiId2cui[ concept_id ]
-                    cui = ontology_concept.get( 'cui' )
-                else:
-                    ## Bailing because we can't figure out how to unpack
-                    ## the CUIs
-                    cui = 'span'
+                if( annotationTypeString.endswith( 'EventMention' ) ):
+                    ## ontologyConceptArr seems to always be a list
+                    if( type( [] ) == type( annot.ontologyConceptArr ) ):
+                        ontology_concept = annot.ontologyConceptArr[ 0 ]
+                        ## Because this concept is the rich representation, we
+                        ## can just directly get the CUI.  It is equivalent to
+                        ## using the follow two-step approach:
+                        ## concept_id = ontology_concept.get( 'xmiID' )
+                        ## cui = xmiId2cui[ concept_id ]
+                        cui = ontology_concept.get( 'cui' )
+                    else:
+                        ## Bailing because we can't figure out how to unpack
+                        ## the CUIs
+                        cui = 'span'
+                elif( annotationTypeString.endswith( 'Modifier' ) ):
+                    cui = annot.category
+                    if( cui is None ):
+                        cui = 'span'
             except TypeError as e:
                 ## A TypeError here means occurs when
                 ## ontologyConceptArray is not defined, meaning
@@ -388,9 +398,8 @@ def main( args , classifiers ):
                                            typesFile = args.typesFile )
     annotation_types = []
     for type_string in [ 'textsem.IdentifiedAnnotation' ,
-                         eventMention_typeString ,
                          modifier_typeString ,
-                         timeMention_typeString ]:
+                         eventMention_typeString ]:
         try:
             typesystem.get_type( type_string )
         except:
@@ -522,12 +531,16 @@ def main( args , classifiers ):
                 continue
             trainModFlag += 1
             if( trainPhase ):
-                if( trainModFlag % 10 in [ 0 , 1 , 2 , 3 , 4 , 5 , 6 ] ):
+                if( args.autoSplit and trainModFlag % 10 in [ 0 , 1 , 2 , 3 , 4 , 5 , 6 ] ):
+                    fileCount += 1
+                elif( not args.autoSplit ):
                     fileCount += 1
                 else:
                     continue
             else:
-                if( trainModFlag % 10 in [ 7 , 8 , 9 ] ):
+                if( args.autoSplit and trainModFlag % 10 in [ 7 , 8 , 9 ] ):
+                    fileCount += 1
+                elif( not args.autoSplit ):
                     fileCount += 1
                 ## Run on all train and test files but write them to
                 ## different folders so we get a score but still keep
@@ -571,12 +584,16 @@ def main( args , classifiers ):
                 continue
             trainModFlag += 1
             if( trainPhase ):
-                if( trainModFlag % 10 in [ 0 , 1 , 2 , 3 , 4 , 5 , 6 ] ):
+                if( args.autoSplit and trainModFlag % 10 in [ 0 , 1 , 2 , 3 , 4 , 5 , 6 ] ):
+                    fileCount += 1
+                elif( not args.autoSplit ):
                     fileCount += 1
                 else:
                     continue
             else:
-                if( trainModFlag % 10 in [ 7 , 8 , 9 ] ):
+                if( args.autoSplit and trainModFlag % 10 in [ 7 , 8 , 9 ] ):
+                    fileCount += 1
+                elif( not args.autoSplit ):
                     fileCount += 1
                 ## Run on all train and test files but write them to
                 ## different folders so we get a score but still keep
@@ -668,10 +685,18 @@ def main( args , classifiers ):
                                       args.zeroStrategy )
             ################
             if( args.outputDir is not None ):
-                if( trainModFlag % 10 in [ 0 , 1 , 2 , 3 , 4 , 5 , 6 ] ):
-                    output_path = os.path.join( args.outputDir , 'train' , xmi_filename )
-                else:                
-                    output_path = os.path.join( args.outputDir , 'test' , xmi_filename )
+                if( trainPhase and
+                    ( not args.autoSplit or
+                      trainModFlag % 10 in [ 0 , 1 , 2 , 3 , 4 , 5 , 6 ] ) ):
+                    if( args.autoSplit ):
+                        output_path = os.path.join( args.outputDir , 'train' , xmi_filename )
+                    else:
+                        output_path = os.path.join( args.outputDir , xmi_filename )
+                else:
+                    if( args.autoSplit ):
+                        output_path = os.path.join( args.outputDir , 'test' , xmi_filename )
+                    else:
+                        output_path = os.path.join( args.outputDir , xmi_filename )
                 ##
                 cas.to_xmi( path = output_path ,
                             pretty_print = True )
@@ -719,6 +744,14 @@ if __name__ == '__main__':
                          choices = [ 'train' , 'test' ] ,
                          dest = 'phase' ,
                          help = 'Set the phase as either training or testing' )
+    parser.add_argument( '--auto-split' , default = True ,
+                         dest = 'autoSplit' ,
+                         help = "Auto-split the directory into a 70/30 train/dev split (opposite of --no-split)" ,
+                         action = "store_true" )
+    parser.add_argument( '--no-split' , default = False ,
+                         dest = 'autoSplit' ,
+                         help = "Process all files without doing any further splits (opposite of --auto-split)" ,
+                         action = "store_false" )
     parser.add_argument( '--partial-match-weight' ,
                          default = 1 ,
                          dest = 'partialMatchWeight' )
