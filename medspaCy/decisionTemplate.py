@@ -265,7 +265,6 @@ def processRemainingAnnotations( cas ,
                 if( begin_offset > kb[ anchor_span ][ 'end_offset' ] ):
                     ## span starts after the anchor span
                     continue
-                ref_cui = kb[ anchor_span ][ 'reference_type' ]
                 if( begin_offset >= kb[ anchor_span ][ 'begin_offset' ] and
                     end_offset <= kb[ anchor_span ][ 'end_offset' ] ):
                     ## span is inside the anchor span
@@ -278,6 +277,7 @@ def processRemainingAnnotations( cas ,
                     kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
                     kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
                     if( trainPhase ):
+                        ref_cui = kb[ anchor_span ][ 'reference_type' ]
                         if( cui not in census ):
                             census[ cui ] = 0
                         census[ cui ] += 1

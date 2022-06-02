@@ -102,13 +102,13 @@ def main( args ):
                 for teamTimeMention in team_cas.select( timeMention_typeString ):
                     if( teamTimeMention.get( 'xmi:id' ) in modifier_mapping ):
                         role_type = modifier_mapping[ teamTimeMention.get( 'xmi:id' ) ]
-                    elif( teamTimeMention.get( 'category' ) is not None ):
-                        role_type = teamTimeMention.get( 'category' )
+                    elif( teamTimeMention.get( 'timeClass' ) is not None ):
+                        role_type = teamTimeMention.get( 'timeClass' )
                     else:
                         role_type = 'Unknown'
                     aTimeMention = timeMentionType( begin = teamTimeMention.get( 'begin' ) ,
                                                     end = teamTimeMention.get( 'end' ) ,
-                                                    category = role_type ,
+                                                    timeClass = role_type ,
                                                     discoveryTechnique = team_id )
                     cas.add_annotation( aTimeMention )
         ########
