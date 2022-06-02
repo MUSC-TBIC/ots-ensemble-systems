@@ -84,6 +84,10 @@ def seedSpansInKb( cas ,
             cui = annot.category
             if( cui is None ):
                 cui = 'span'
+        elif( annotationTypeString == timeMention_typeString ):
+            cui = annot.timeClass
+            if( cui is None ):
+                cui = 'span'
         else:
             cui = 'span'
         if( not trainPhase and weighting == 'ranked' ):
@@ -160,6 +164,10 @@ def processRemainingAnnotations( cas ,
                     cui = 'span'
             elif( annotationTypeString == modifier_typeString ):
                 cui = annot.category
+                if( cui is None ):
+                    cui = 'span'
+            elif( annotationTypeString == timeMention_typeString ):
+                cui = annot.timeClass
                 if( cui is None ):
                     cui = 'span'
             else:
@@ -408,6 +416,7 @@ def main( args , classifiers ):
     annotation_types = []
     for type_string in [ 'textsem.IdentifiedAnnotation' ,
                          modifier_typeString ,
+                         timeMention_typeString ,
                          eventMention_typeString ]:
         try:
             typesystem.get_type( type_string )
