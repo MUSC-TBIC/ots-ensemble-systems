@@ -126,10 +126,12 @@ def processRemainingAnnotations( cas ,
     for annot in cas.select( annotationTypeString ):
         technique = annot.discoveryTechnique
         if( technique == '0' or
-            technique not in classifiers or
+            technique not in classifiers ):
+            continue
+        if( votingUnit == 'span' and technique == top_classifier_id and
+            ( not trainPhase ) ):
             ## We already took care of the top_classifier above
             ## for span-based voting during the testing phase
-            ( not trainPhase and votingUnit == 'span' and technique == top_classifier_id ) ):
             continue
         ## TODO - refactor variable named 'cui' to reflect
         ##        more fluid use across annotation types
@@ -305,6 +307,7 @@ def processRemainingAnnotations( cas ,
                     kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
                     kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
                     if( trainPhase ):
+                        ref_cui = kb[ anchor_span ][ 'reference_type' ]
                         if( cui not in census ):
                             census[ cui ] = 0
                         census[ cui ] += 1
@@ -332,6 +335,7 @@ def processRemainingAnnotations( cas ,
                     kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
                     kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
                     if( trainPhase ):
+                        ref_cui = kb[ anchor_span ][ 'reference_type' ]
                         if( cui not in census ):
                             census[ cui ] = 0
                         census[ cui ] += 1
@@ -359,6 +363,7 @@ def processRemainingAnnotations( cas ,
                     kb[ anchor_span ][ 'decision_profile' ][ technique ] = {}
                     kb[ anchor_span ][ 'decision_profile' ][ technique ][ cui ] = weight
                     if( trainPhase ):
+                        ref_cui = kb[ anchor_span ][ 'reference_type' ]
                         if( cui not in census ):
                             census[ cui ] = 0
                         census[ cui ] += 1
@@ -374,7 +379,7 @@ def processRemainingAnnotations( cas ,
                     matched_flag = True
                 else:
                     ## How did we get here?
-                    log.error( 'Somehow span {} and reference span {} are neither a match nor mismatch in file \'{}\''.format( span ,
+                    log.debug( 'Somehow span {} and reference span {} are neither a match nor mismatch in file \'{}\''.format( span ,
                                                                                                                                anchor_span ,
                                                                                                                                filename ) )
             ####
@@ -565,16 +570,18 @@ def main( args , classifiers ):
                 ## our workbench a little cleaner
                 ##else:
                 ##    1
-            for annotationTypeString in annotation_types:
-                census , decision_profiles , kb = seedSpansInKb( cas ,
-                                                                 census ,
-                                                                 decision_profiles ,
-                                                                 kb ,
-                                                                 xmiId2cui ,
-                                                                 annotationTypeString ,
-                                                                 trainPhase ,
-                                                                 top_classifier_id ,
-                                                                 args.weighting )
+            for annotationTypeString in tqdm( annotation_types ,
+                                              desc = 'Seeding knowledge base with types (n={})'.format( len( annotation_types ) ) ,
+                                              leave = False ):
+                census , decision_profiles , kb = seedSpansInKb( cas = cas ,
+                                                                 census = census ,
+                                                                 decision_profiles = decision_profiles ,
+                                                                 kb = kb ,
+                                                                 xmiId2cui = xmiId2cui ,
+                                                                 annotationTypeString = annotationTypeString ,
+                                                                 trainPhase = trainPhase ,
+                                                                 top_classifier_id = top_classifier_id ,
+                                                                 weighting = args.weighting )
         elif( args.votingUnit == 'doc' ):
             ## For the doc-based voting, we want to seed the kb with
             ## the concept attribute types and values during training
@@ -686,13 +693,13 @@ def main( args , classifiers ):
         if( not trainPhase ):
             if( args.votingUnit == 'sentence' or
                 args.votingUnit == 'span' ):
-                cas = cosineSpannedVotes( cas ,
-                                          NoteNlp ,
-                                          kb ,
-                                          decision_profiles ,
-                                          classifiers ,
-                                          args.votingUnit ,
-                                          args.zeroStrategy )
+                cas = cosineSpannedVotes( cas = cas ,
+                                          NoteNlp = NoteNlp ,
+                                          kb = kb ,
+                                          decisionProfiles = decision_profiles ,
+                                          classifiers = classifiers ,
+                                          votingUnit = args.votingUnit ,
+                                          zeroStrategy = args.zeroStrategy )
             elif( args.votingUnit == 'doc' ):
                 cas = cosineDocVotes( cas ,
                                       NoteNlp ,

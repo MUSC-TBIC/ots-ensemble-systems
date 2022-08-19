@@ -30,6 +30,8 @@ attribute_typeString = 'org.apache.ctakes.typesystem.type.refsem.Attribute'
 relationArgument_typeString = 'org.apache.ctakes.typesystem.type.relation.RelationArgument'
 binaryTextRelation_typeString = 'org.apache.ctakes.typesystem.type.relation.BinaryTextRelation'
 
+noteNlp_typeString = 'edu.musc.tbic.omop_cdm.Note_Nlp_TableProperties'
+
 
 def loadTypeSystem( typesDir , typesFile = None ):
     ############################
@@ -106,7 +108,7 @@ def loadTypeSystem( typesDir , typesFile = None ):
                                 rangeTypeName = 'uima.cas.Double' )
     ############
     ## ... for OMOP CDM v5.3 NOTE_NLP table properties
-    NoteNlp = typesystem.create_type( name = 'edu.musc.tbic.omop_cdm.Note_Nlp_TableProperties' ,
+    NoteNlp = typesystem.create_type( name = noteNlp_typeString ,
                                       supertypeName = 'uima.tcas.Annotation' )
     typesystem.add_feature( type_ = NoteNlp ,
                             name = 'note_nlp_id' ,

@@ -32,6 +32,24 @@ def main( args ):
     eventPropertiesType = typesystem.get_type( eventProperties_typeString )
     ############################
     ## Iterate over the files
+    if( args.inputRefDir is None ):
+        args.inputRefDir = args.outputDir
+        ########
+        txt_filenames = [ os.path.basename( f ) for f in glob.glob( os.path.join( args.inputTextDir ,
+                                                                                  '*.txt' ) ) ]
+        for txt_filename in tqdm( txt_filenames ):
+            xmi_filename = re.sub( '.txt$' , '.xmi' , txt_filename )
+            cas = cassis.Cas( typesystem = typesystem )
+            with open( os.path.join( args.inputTextDir ,
+                                     txt_filename ) ,
+                       'r' ) as fp:
+                note_contents = fp.read().strip()
+            cas.sofa_string = note_contents
+            cas.sofa_mime = "text/plain"
+            cas.to_xmi( path = os.path.join( args.inputRefDir ,
+                                             xmi_filename ) ,
+                        pretty_print = True )
+    ########
     xmi_filenames = [ os.path.basename( f ) for f in glob.glob( os.path.join( args.inputRefDir ,
                                                                               '*.xmi' ) ) ]
     for xmi_filename in tqdm( xmi_filenames ):
@@ -127,7 +145,7 @@ if __name__ == '__main__':
     parser.add_argument( '--input-text' ,
                          dest = 'inputTextDir' ,
                          help = 'Input directory containing plain text files' )
-    parser.add_argument( '--input-ref' ,
+    parser.add_argument( '--input-ref' , default = None ,
                          dest = 'inputRefDir' ,
                          help = 'Input directory containing reference standard files' )
     parser.add_argument( '--input-systems' ,

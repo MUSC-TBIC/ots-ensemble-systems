@@ -19,12 +19,14 @@
   <refsem:UmlsConcept xmi:id="17" cui="C1971295" tui="T033"/>
   <refsem:UmlsConcept xmi:id="18" cui="C1698618" tui="T033"/>
   <refsem:UmlsConcept xmi:id="19" cui="C3853727" tui="T033"/>
-  <refsem:Event xmi:id="20" properties="24" ontologyConcept="2"/>
+  <refsem:Event xmi:id="20" properties="26" ontologyConcept="2"/>
   <textsem:EventMention xmi:id="21" event="20" begin="12" end="19" sofa="1" ontologyConceptArr="2"/>
-  <refsem:Event xmi:id="22" properties="25" ontologyConcept="16"/>
+  <refsem:Event xmi:id="22" properties="27" ontologyConcept="16"/>
   <textsem:EventMention xmi:id="23" event="22" begin="63" end="70" sofa="1" ontologyConceptArr="16"/>
-  <refsem:EventProperties xmi:id="24" category="Unknown" aspect="Unknown"/>
-  <refsem:EventProperties xmi:id="25" aspect="Unknown"/>
+  <textsem:Modifier xmi:id="24" category="current" begin="12" end="19" sofa="1"/>
+  <textsem:Modifier xmi:id="25" category="with_others" begin="23" end="49" sofa="1"/>
+  <refsem:EventProperties xmi:id="26" category="Unknown" aspect="Unknown"/>
+  <refsem:EventProperties xmi:id="27" aspect="Unknown"/>
   <cas:Sofa xmi:id="1" sofaNum="1" sofaID="_InitialView" mimeType="text/plain" sofaString="The patient resides in a skilled nursing facility.&#10;&#10;History of smoking two packs per day."/>
-  <cas:View sofa="1" members="2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23"/>
+  <cas:View sofa="1" members="2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25"/>
 </xmi:XMI>
