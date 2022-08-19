@@ -12,6 +12,7 @@ import medspacy
 import cassis
 
 from libTypeSystem import loadTypeSystem
+from libTypeSystem import metadata_typeString, umlsConcept_typeString
 from libEnsemble import tallySpannedVotes, tallyDocVotes
 
 
@@ -62,7 +63,7 @@ def main( args , classifiers ):
             cas = cassis.load_cas_from_xmi( fp ,
                                             typesystem = typesystem )
         ## Grab the discoveryTechnique long names
-        for metadata in cas.select( 'refsem.Metadata' ):
+        for metadata in cas.select( metadata_typeString ):
             classifier_name , classifier_id = metadata.other.split( '=' )
             if( classifier_id == '0' or
                 classifier_id not in classifiers ):
@@ -70,7 +71,7 @@ def main( args , classifiers ):
             classifier2id[ classifier_name ] = classifier_id
             id2classifier[ classifier_id ] = classifier_name
         ## Grab all the CUIs and their xmi:id's
-        for umls_concept in cas.select( 'refsem.UmlsConcept' ):
+        for umls_concept in cas.select( umlsConcept_typeString ):
             xmi_id = umls_concept.xmiID
             cui = umls_concept.cui
             xmiId2cui[ xmi_id ] = cui

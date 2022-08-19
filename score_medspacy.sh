@@ -38,7 +38,7 @@ mkdir -p ${SYS_DIR}
 ## TODO - we only need to run the ref-dir creation once so figure
 ##        out an elegant way to have it trigger only the first time
 ##          --ref-dir ${REF_DIR} \
-python3 ${ENSEMBLE_DIR}/oracle-ensemble.py \
+python3 ${ENSEMBLE_DIR}/oracleEnsemble.py \
   --input-dir ${MERGED_DIR} \
   --classifier-list ${TEAMS} \
   --output-dir ${SYS_DIR} \
@@ -67,7 +67,7 @@ do
     export SYS_DIR=${RESULT_DIR}/${TASK}/${METHOD}/${MINVOTES}_${TEAMS}
     mkdir -p ${SYS_DIR}
     
-    python3 ${ENSEMBLE_DIR}/voting-ensemble.py \
+    python3 ${ENSEMBLE_DIR}/votingEnsemble.py \
       --input-dir ${MERGED_DIR} \
       --classifier-list ${TEAMS} \
       --min-votes ${MINVOTES} \

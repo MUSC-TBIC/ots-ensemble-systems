@@ -53,6 +53,24 @@ def cosineSpannedVotes( cas ,
         ####
         decision_profile = kb[ span ][ 'decision_profile' ]
         for template_type in decisionProfiles:
+            ## De-prioritize the null vote or abstension vote so that
+            ## equally probably positive/active votes will always beat
+            ## out the null vote
+            ## TODO - configure this null vote in case it surfaces in different ways
+            if( template_type in [ 'NONE' ] ):
+                continue
+            decision_template = decisionProfiles[ template_type ]
+            cosine_sim = cosine_profiles( decision_profile ,
+                                          decision_template )
+            if( cosine_sim > max_cui_sim and
+                cosine_sim >= threshold ):
+                max_cui = template_type
+                max_cui_sim = cosine_sim
+        ## Check to make sure the null vote isn't a much better choice
+        ## after we've figured out the top positive vote
+        for template_type in [ 'NONE' ]:
+            if( template_type not in decisionProfiles ):
+                continue
             decision_template = decisionProfiles[ template_type ]
             cosine_sim = cosine_profiles( decision_profile ,
                                           decision_template )

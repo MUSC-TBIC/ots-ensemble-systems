@@ -71,7 +71,7 @@ export MINVOTES=1
 
 ## Create an oracle of best possible output
 ${ENSEMBLE_CONDA}/bin/python3 \
-    ${ENSEMBLE_DIR}/medspaCy/oracle-ensemble.py \
+    ${ENSEMBLE_DIR}/medspaCy/oracleEnsemble.py \
     --types-dir ${ENSEMBLE_DIR}/types \
     --input-dir "${MERGED_OUT}" \
     --classifier-list ${CLASSIFIERS} \
@@ -112,7 +112,7 @@ do
     
     ## Train Decision Template ensemble system
     ${ENSEMBLE_CONDA}/bin/python3 \
-            ${ENSEMBLE_DIR}/medspaCy/decision-template.py \
+            ${ENSEMBLE_DIR}/medspaCy/decisionTemplate.py \
             --types-dir ${ENSEMBLE_DIR}/types \
             --phase train \
             --voting-unit span \
@@ -124,7 +124,7 @@ do
     
     ## Test Decision Template ensemble system
     ${ENSEMBLE_CONDA}/bin/python3 \
-            ${ENSEMBLE_DIR}/medspaCy/decision-template.py \
+            ${ENSEMBLE_DIR}/medspaCy/decisionTemplate.py \
             --types-dir ${ENSEMBLE_DIR}/types \
             --phase test \
             --voting-unit span \
@@ -185,7 +185,7 @@ do
     
     ## Simple voting ensemble system
     ${ENSEMBLE_CONDA}/bin/python3 \
-        ${ENSEMBLE_DIR}/medspaCy/voting-ensemble.py \
+        ${ENSEMBLE_DIR}/medspaCy/votingEnsemble.py \
         --types-dir ${ENSEMBLE_DIR}/types \
         --input-dir "${MERGED_OUT}" \
         --voting-unit span \

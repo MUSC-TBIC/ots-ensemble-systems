@@ -1,0 +1,62 @@
+{
+    "10-15": {
+        "begin_offset": 10,
+        "end_offset": 15,
+        "norm_counts": {
+            "Asthma": 1
+        },
+        "norm_weights": {
+            "Asthma": 0.5
+        },
+        "decision_profile": {
+            "2": {
+                "Asthma": 0.5
+            }
+        }
+    },
+    "20-25": {
+        "begin_offset": 20,
+        "end_offset": 25,
+        "norm_counts": {
+            "Asthma": 1
+        },
+        "norm_weights": {
+            "Asthma": 0.5
+        },
+        "decision_profile": {
+            "2": {
+                "Asthma": 0.5
+            }
+        }
+    },
+    "50-55": {
+        "begin_offset": 50,
+        "end_offset": 55,
+        "norm_counts": {
+            "GERD": 1
+        },
+        "norm_weights": {
+            "GERD": 0.5
+        },
+        "decision_profile": {
+            "2": {
+                "GERD": 0.5
+            }
+        }
+    },
+    "60-65": {
+        "begin_offset": 60,
+        "end_offset": 65,
+        "norm_counts": {
+            "CAD": 1
+        },
+        "norm_weights": {
+            "CAD": 0.5
+        },
+        "decision_profile": {
+            "2": {
+                "CAD": 0.5
+            }
+        }
+    }
+}

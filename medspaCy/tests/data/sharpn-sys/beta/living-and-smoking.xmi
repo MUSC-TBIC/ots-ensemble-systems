@@ -1,0 +1,28 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<xmi:XMI xmlns:xmi="http://www.omg.org/XMI" xmlns:cas="http:///uima/cas.ecore" xmlns:refsem="http:///org/apache/ctakes/typesystem/type/refsem.ecore" xmlns:textsem="http:///org/apache/ctakes/typesystem/type/textsem.ecore" xmi:version="2.0">
+  <cas:NULL xmi:id="0"/>
+  <refsem:UmlsConcept xmi:id="2" cui="C2184149" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="3" cui="C0439044" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="4" cui="C0557130" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="5" cui="C3242657" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="6" cui="C0237154" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="7" cui="C0242271" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="8" cui="C0557351" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="9" cui="C0041674" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="10" cui="C0035345" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="11" cui="C0682148" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="12" cui="C0038492" tui="T098"/>
+  <refsem:UmlsConcept xmi:id="13" cui="C0555052" tui="T097"/>
+  <refsem:UmlsConcept xmi:id="14" cui="C0001948" tui="T055"/>
+  <refsem:UmlsConcept xmi:id="15" cui="C0281875" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="16" cui="C1287520" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="17" cui="C1971295" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="18" cui="C1698618" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="19" cui="C3853727" tui="T033"/>
+  <refsem:Event xmi:id="22" properties="25" ontologyConcept="16"/>
+  <textsem:EventMention xmi:id="23" event="22" begin="63" end="70" sofa="1" ontologyConceptArr="16"/>
+  <refsem:EventProperties xmi:id="24" category="Unknown" aspect="Unknown"/>
+  <refsem:EventProperties xmi:id="25" aspect="Unknown"/>
+  <cas:Sofa xmi:id="1" sofaNum="1" sofaID="_InitialView" mimeType="text/plain" sofaString="The patient resides in a skilled nursing facility.&#10;&#10;History of smoking two packs per day."/>
+  <cas:View sofa="1" members="2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 22 23"/>
+</xmi:XMI>
