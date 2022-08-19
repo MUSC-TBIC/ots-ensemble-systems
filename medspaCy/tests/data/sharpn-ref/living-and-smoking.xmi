@@ -1,0 +1,47 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<xmi:XMI xmlns:xmi="http://www.omg.org/XMI" xmlns:cas="http:///uima/cas.ecore" xmlns:refsem="http:///org/apache/ctakes/typesystem/type/refsem.ecore" xmlns:textsem="http:///org/apache/ctakes/typesystem/type/textsem.ecore" xmlns:relation="http:///org/apache/ctakes/typesystem/type/relation.ecore" xmi:version="2.0">
+  <cas:NULL xmi:id="0"/>
+  <refsem:UmlsConcept xmi:id="2" cui="C2184149" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="3" cui="C0439044" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="4" cui="C0557130" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="5" cui="C3242657" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="6" cui="C0237154" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="7" cui="C0242271" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="8" cui="C0557351" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="9" cui="C0041674" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="10" cui="C0035345" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="11" cui="C0682148" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="12" cui="C0038492" tui="T098"/>
+  <refsem:UmlsConcept xmi:id="13" cui="C0555052" tui="T097"/>
+  <refsem:UmlsConcept xmi:id="14" cui="C0001948" tui="T055"/>
+  <refsem:UmlsConcept xmi:id="15" cui="C0281875" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="16" cui="C1287520" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="17" cui="C1971295" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="18" cui="C1698618" tui="T033"/>
+  <refsem:UmlsConcept xmi:id="19" cui="C3853727" tui="T033"/>
+  <refsem:Event xmi:id="20" properties="41" ontologyConcept="5"/>
+  <textsem:EventMention xmi:id="21" event="20" begin="12" end="19" sofa="1" ontologyConceptArr="2"/>
+  <relation:RelationArgument xmi:id="22" argument="21" role="Trigger"/>
+  <textsem:Modifier xmi:id="23" begin="12" end="19" sofa="1"/>
+  <relation:RelationArgument xmi:id="24" argument="23" role="Status"/>
+  <relation:BinaryTextRelation xmi:id="25" arg1="22" arg2="24"/>
+  <textsem:Modifier xmi:id="26" begin="23" end="49" sofa="1"/>
+  <relation:RelationArgument xmi:id="27" argument="26" role="Type"/>
+  <relation:BinaryTextRelation xmi:id="28" arg1="22" arg2="27"/>
+  <refsem:Event xmi:id="29" properties="42" ontologyConcept="19"/>
+  <textsem:EventMention xmi:id="30" event="29" begin="63" end="70" sofa="1" ontologyConceptArr="16"/>
+  <relation:RelationArgument xmi:id="31" argument="30" role="Trigger"/>
+  <textsem:Modifier xmi:id="32" begin="71" end="80" sofa="1"/>
+  <relation:RelationArgument xmi:id="33" argument="32" role="Amount"/>
+  <relation:BinaryTextRelation xmi:id="34" arg1="31" arg2="33"/>
+  <textsem:Modifier xmi:id="35" begin="52" end="59" sofa="1"/>
+  <relation:RelationArgument xmi:id="36" argument="35" role="Status"/>
+  <relation:BinaryTextRelation xmi:id="37" arg1="31" arg2="36"/>
+  <textsem:TimeMention xmi:id="38" begin="81" end="88" sofa="1"/>
+  <relation:RelationArgument xmi:id="39" argument="38" role="Frequency"/>
+  <relation:BinaryTextRelation xmi:id="40" arg1="31" arg2="39"/>
+  <refsem:EventProperties xmi:id="41" category="with_others" aspect="current"/>
+  <refsem:EventProperties xmi:id="42" aspect="current"/>
+  <cas:Sofa xmi:id="1" sofaNum="1" sofaID="_InitialView" mimeType="text/plain" sofaString="The patient resides in a skilled nursing facility.&#10;&#10;History of smoking two packs per day."/>
+  <cas:View sofa="1" members="2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40"/>
+</xmi:XMI>

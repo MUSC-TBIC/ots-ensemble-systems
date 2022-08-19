@@ -1,0 +1,37 @@
+{
+    "12-19": {
+        "begin_offset": 12,
+        "end_offset": 19,
+        "norm_counts": {
+            "C2184149": 2
+        },
+        "norm_weights": {
+            "C2184149": 2.0
+        },
+        "decision_profile": {
+            "1": {
+                "C2184149": 1.0
+            }
+        },
+        "reference_type": "C2184149"
+    },
+    "63-70": {
+        "begin_offset": 63,
+        "end_offset": 70,
+        "norm_counts": {
+            "C1287520": 3
+        },
+        "norm_weights": {
+            "C1287520": 2.5
+        },
+        "decision_profile": {
+            "1": {
+                "C1287520": 1.0
+            },
+            "2": {
+                "C1287520": 0.5
+            }
+        },
+        "reference_type": "C1287520"
+    }
+}

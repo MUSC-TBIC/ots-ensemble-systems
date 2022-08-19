@@ -11,6 +11,8 @@ import cassis
 
 from lxml import etree as ET
 
+from libTypeSystem import metadata_typeString
+
 def process_ann_file( cas , IdentifiedAnnotation ,
                       input_filename ,
                       classifier_id ):
@@ -114,7 +116,7 @@ def main( args ):
     ############
     ## ... for Metadata
     ## TODO - this parent and supertype should probably be something else
-    NoteMetadata = typesystem.create_type( name = 'refsem.Metadata' ,
+    NoteMetadata = typesystem.create_type( name = metadata_typeString ,
                                            supertypeName = 'uima.tcas.Annotation' )
     ## TODO - how to represent pairs, as per the reference standard?
     typesystem.add_feature( type_ = NoteMetadata ,

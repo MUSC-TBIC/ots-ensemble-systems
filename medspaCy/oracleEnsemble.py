@@ -12,6 +12,7 @@ import medspacy
 import cassis
 
 from libTypeSystem import loadTypeSystem
+from libTypeSystem import umlsConcept_typeString
 from libEnsemble import tallySpannedVotes, tallyDocVotes
 
 
@@ -53,7 +54,7 @@ def main( args , classifiers ):
             cas = cassis.load_cas_from_xmi( fp ,
                                             typesystem = typesystem )
         ## Grab all the CUIs and their xmi:id's
-        for umls_concept in cas.select( 'refsem.UmlsConcept' ):
+        for umls_concept in cas.select( umlsConcept_typeString ):
             xmi_id = umls_concept.xmiID
             cui = umls_concept.cui
             xmiId2cui[ xmi_id ] = cui
